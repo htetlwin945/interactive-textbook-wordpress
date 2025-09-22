@@ -81,6 +81,36 @@ document.addEventListener('DOMContentLoaded', () => {
              transition: border-color 0.2s; background-color: #bbb; min-height: 150px;
         }
         .thumbnail-item.active { border-color: #007bff; }
+        #floating-zoom-controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            z-index: 20;
+            display: none; /* Hide by default on larger screens */
+            flex-direction: column;
+            gap: 10px;
+        }
+        .floating-zoom-btn {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            border: 1px solid #aaa;
+            background-color: rgba(64, 64, 64, 0.9);
+            color: white;
+            font-size: 32px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            line-height: 1;
+        }
+        @media (max-width: 768px) {
+            #floating-zoom-controls {
+                display: flex;
+            }
+        }
     `;
     document.head.appendChild(style);
     // --- END STYLES ---
@@ -124,6 +154,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const sidebarToggleBtn = document.getElementById('sidebar-toggle-btn');
     const thumbnailView = document.getElementById('thumbnail-view');
     const saveStatusSpan = document.getElementById('save-status');
+    const floatingZoomInBtn = document.getElementById('floating-zoom-in-btn');
+    const floatingZoomOutBtn = document.getElementById('floating-zoom-out-btn');
     // --- END DOM ELEMENT REFERENCES ---
 
     // --- STATE VARIABLES ---
@@ -383,6 +415,8 @@ document.addEventListener('DOMContentLoaded', () => {
     container.classList.add('sidebar-closed');
     zoomInBtn.addEventListener('click', () => setZoom(currentScale + 0.25));
     zoomOutBtn.addEventListener('click', () => setZoom(currentScale - 0.25));
+    if (floatingZoomInBtn) floatingZoomInBtn.addEventListener('click', () => setZoom(currentScale + 0.25));
+    if (floatingZoomOutBtn) floatingZoomOutBtn.addEventListener('click', () => setZoom(currentScale - 0.25));
     fullscreenBtn.addEventListener('click', toggleFullScreen);
     prevPageBtn.addEventListener('click', () => { if (currentPageNum > 1 && pageElements[currentPageNum - 2]) pageElements[currentPageNum - 2].scrollIntoView({behavior: 'smooth', block: 'start'}); });
     nextPageBtn.addEventListener('click', () => { if (currentPageNum < pdfDoc.numPages && pageElements[currentPageNum]) pageElements[currentPageNum].scrollIntoView({behavior: 'smooth', block: 'start'}); });
@@ -413,9 +447,8 @@ document.addEventListener('DOMContentLoaded', () => {
             // Explicitly end one-finger panning when a second finger is introduced.
             touchState.singleFingerPan = false;
 
-            touchState.pinching = true;
-            touchState.panning = true;
-            touchState.lastDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+            touchState.pinching = false; // Pinch is disabled
+            touchState.panning = true; // This flag is for two-finger pan
             touchState.lastPanPoint = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
 
             // Prevent accidental selection by disabling canvas selection during pinch
@@ -442,12 +475,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         lastAnimationFrame = requestAnimationFrame(() => {
-            // Handle two-finger pan and zoom gestures.
-            if (touchState.pinching && e.touches.length === 2) {
+            // Handle two-finger pan gesture.
+            if (touchState.panning && e.touches.length === 2) {
                 e.preventDefault();
 
                 const newPanPoint = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
-                const newDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
 
                 // --- Panning Logic ---
                 const dx = newPanPoint.x - touchState.lastPanPoint.x;
@@ -455,29 +487,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 pdfScrollContainer.scrollLeft -= dx;
                 pdfScrollContainer.scrollTop -= dy;
 
-                // --- Anchored Zooming Logic ---
-                if (touchState.lastDist > 0) {
-                    const scaleFactor = newDist / touchState.lastDist;
-                    const oldScale = currentScale;
-                    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, oldScale * scaleFactor));
-
-                    const finalScaleFactor = (oldScale > 0) ? newScale / oldScale : 1;
-
-                    if (finalScaleFactor !== 1) {
-                        const rect = pdfScrollContainer.getBoundingClientRect();
-                        const pinchPoint = { x: newPanPoint.x - rect.left, y: newPanPoint.y - rect.top };
-
-                        const newScrollLeft = (pdfScrollContainer.scrollLeft + pinchPoint.x) * finalScaleFactor - pinchPoint.x;
-                        const newScrollTop = (pdfScrollContainer.scrollTop + pinchPoint.y) * finalScaleFactor - pinchPoint.y;
-
-                        pdfScrollContainer.scrollLeft = newScrollLeft;
-                        pdfScrollContainer.scrollTop = newScrollTop;
-
-                        setZoom(newScale);
-                    }
-                }
-
-                touchState.lastDist = newDist;
                 touchState.lastPanPoint = newPanPoint;
             }
             // Handle single-finger panning for navigation.
@@ -493,9 +502,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }, { passive: false });
 
     pdfScrollContainer.addEventListener('touchend', e => {
-        // If we were pinching, restore the selection state based on the current tool
-        // after the browser has processed the touchend event.
-        if (touchState.pinching) {
+        // If we were doing a two-finger pan, restore the selection state based on the current tool.
+        // This prevents accidental selections after a pan/zoom gesture.
+        if (touchState.panning) {
             setTimeout(() => {
                 setActiveTool(currentTool);
             }, 10);
