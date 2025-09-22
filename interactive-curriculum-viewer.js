@@ -414,6 +414,14 @@ document.addEventListener('DOMContentLoaded', () => {
             touchState.panning = true;
             touchState.lastDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
             touchState.lastPanPoint = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
+
+            // Prevent accidental selection by disabling canvas selection during pinch
+            Object.values(pageStates).forEach(state => {
+                if (state.fabricCanvas) {
+                    state.fabricCanvas.selection = false;
+                    state.fabricCanvas.forEachObject(obj => obj.selectable = false);
+                }
+            });
         }
         // A single finger touch is for panning/scrolling ONLY if a navigation tool is active.
         else if (e.touches.length === 1 && (currentTool === 'select' || currentTool === 'pan')) {
@@ -482,6 +490,14 @@ document.addEventListener('DOMContentLoaded', () => {
     }, { passive: false });
 
     pdfScrollContainer.addEventListener('touchend', e => {
+        // If we were pinching, restore the selection state based on the current tool
+        // after the browser has processed the touchend event.
+        if (touchState.pinching) {
+            setTimeout(() => {
+                setActiveTool(currentTool);
+            }, 10);
+        }
+
         // Reset all touch states when the interaction ends.
         touchState.pinching = false;
         touchState.panning = false;
