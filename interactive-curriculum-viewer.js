@@ -7,15 +7,15 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- START STYLES ---
     const style = document.createElement('style');
     style.innerHTML = `
-        #interactive-curriculum-container { 
+        #interactive-curriculum-container {
             font-family: sans-serif; display: flex; flex-direction: column; width: 100%; height: 85vh;
-            max-width: 1200px; margin: auto; background-color: #f0f0f0; border: 1px solid #ccc; 
-            border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden; 
+            max-width: 1200px; margin: auto; background-color: #f0f0f0; border: 1px solid #ccc;
+            border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); overflow: hidden;
         }
         #interactive-curriculum-container:fullscreen { max-width: 100%; height: 100%; border-radius: 0; border: none; }
-        #pdf-viewer-toolbar { 
-            display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px; 
-            padding: 8px 12px; background-color: #404040; border-bottom: 1px solid #333; width: 100%; 
+        #pdf-viewer-toolbar {
+            display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 8px;
+            padding: 8px 12px; background-color: #404040; border-bottom: 1px solid #333; width: 100%;
             box-sizing: border-box; z-index: 10; flex-shrink: 0; color: #fff;
         }
         @media (max-width: 768px) {
@@ -31,7 +31,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         .toolbar-group { display: flex; align-items: center; padding: 0 10px; }
         .toolbar-group:not(:last-child) { border-right: 1px solid #666; }
-        .toolbar-btn { 
+        .toolbar-btn {
             background-color: transparent; border: none; color: #fff; cursor: pointer;
             border-radius: 4px; padding: 6px; margin: 0 2px;
         }
@@ -142,17 +142,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let lastPanPoint = { x: 0, y: 0 };
     let touchState = { pinching: false, panning: false, singleFingerPan: false, lastDist: 0, lastPanPoint: { x: 0, y: 0 } };
     // --- END STATE VARIABLES ---
-    
+
     // --- UTILITY & CORE FUNCTIONS ---
     function debounce(func, delay) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), delay); }; }
     function toggleFullScreen() { if (!document.fullscreenElement) { container.requestFullscreen(); } else { document.exitFullscreen(); } }
-    
+
     const debouncedUpdateAllPages = debounce(() => {
         pageElements.forEach(pageDiv => { if (pageDiv.hasAttribute('data-rendered')) { updatePageRender(pageDiv); } });
     }, 100);
 
     function setZoom(newScale) { currentScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale)); debouncedUpdateAllPages(); }
-    
+
     // --- ANNOTATION & DATA LOGIC ---
     async function saveLastPage(pageNum) { if (!documentId || !pageNum) return; try { await fetch(`${interactiveCurriculumData.restUrl}interactive-curriculum/v2/last-page`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': interactiveCurriculumData.nonce }, body: JSON.stringify({ document_id: documentId, page_num: pageNum }) }); } catch (error) { console.error('Error saving last page:', error); } }
     async function saveUserColor(color) { try { await fetch(`${interactiveCurriculumData.restUrl}interactive-curriculum/v2/user-color`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': interactiveCurriculumData.nonce }, body: JSON.stringify({ color: color }) }); } catch (error) { console.error('Error saving user color:', error); } }
@@ -180,12 +180,12 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) { console.error('Error loading annotations:', error); }
         saveState(pageNum, fabricCanvas, false);
     }
-    
+
     function setActiveTool(toolName) {
         currentTool = toolName;
         toolButtons.forEach(btn => btn.classList.remove('active-tool'));
         document.getElementById(`${toolName}-tool-btn`).classList.add('active-tool');
-        
+
         pdfScrollContainer.classList.remove('pan-mode');
         isPanMode = false;
 
@@ -193,7 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (state.fabricCanvas) {
                 const canvas = state.fabricCanvas;
                 canvas.isDrawingMode = false;
-                
+
                 // Default to non-interactive mode for annotations
                 canvas.selection = false;
                 canvas.forEachObject(obj => obj.selectable = false);
@@ -247,7 +247,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 canvas.width = thumbViewport.width;
                 canvas.height = thumbViewport.height;
                 thumbContainer.appendChild(canvas);
-                
+
                 thumbnailView.appendChild(thumbContainer);
                 thumbnailElements.push(thumbContainer);
 
@@ -261,11 +261,11 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     }
-    
+
     async function updatePageRender(pageDiv) {
         const pageNum = parseInt(pageDiv.dataset.pageNumber, 10);
         if (!pageDiv.hasAttribute('data-rendered') || !pdfDoc) return;
-        
+
         const page = await pdfDoc.getPage(pageNum);
         const viewport = page.getViewport({ scale: currentScale });
 
@@ -275,7 +275,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const pdfCanvas = pageDiv.querySelector('.pdf-canvas');
         pdfCanvas.width = viewport.width;
         pdfCanvas.height = viewport.height;
-        
+
         const fabricCanvas = pageStates[pageNum].fabricCanvas;
         fabricCanvas.setDimensions({ width: viewport.width, height: viewport.height });
         fabricCanvas.setZoom(currentScale);
@@ -289,7 +289,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const pageNum = parseInt(pageDiv.dataset.pageNumber, 10);
         try {
             const page = await pdfDoc.getPage(pageNum);
-            
+
             const pdfCanvas = document.createElement('canvas');
             pdfCanvas.className = 'pdf-canvas';
             pageDiv.appendChild(pdfCanvas);
@@ -300,7 +300,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const fabricCanvas = new fabric.Canvas(annotationCanvasEl);
             pageStates[pageNum] = { fabricCanvas, history: [], redoStack: [] };
-            
+
             pageDiv.setAttribute('data-rendered', 'true');
             await updatePageRender(pageDiv);
             await loadAnnotations(pageNum, fabricCanvas);
@@ -309,7 +309,7 @@ document.addEventListener('DOMContentLoaded', () => {
             console.error(`Error rendering page ${pageNum}:`, error);
         }
     }
-    
+
     // --- MAIN INITIALIZATION ---
     async function initPDFViewer() {
         if (!pdfUrl) return;
@@ -346,19 +346,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 });
             }, { root: pdfScrollContainer, threshold: 0.5 });
-            
+
             const firstPage = await pdfDoc.getPage(1);
             const viewport = firstPage.getViewport({ scale: 1.0 });
             const pageWidth = pdfScrollContainer.clientWidth - 40;
             currentScale = pageWidth / viewport.width;
-            
+
             for (let i = 1; i <= pdfDoc.numPages; i++) {
                 const pageDiv = document.createElement('div');
                 pageDiv.className = 'pdf-page-container';
                 pageDiv.dataset.pageNumber = i;
                 pageContainer.appendChild(pageDiv);
                 pageElements.push(pageDiv);
-                
+
                 pageRenderObserver.observe(pageDiv);
                 pageNumObserver.observe(pageDiv);
             }
@@ -393,14 +393,14 @@ document.addEventListener('DOMContentLoaded', () => {
     undoBtn.addEventListener('click', undo);
     redoBtn.addEventListener('click', redo);
     clearPageBtn.addEventListener('click', () => { const state = pageStates[currentPageNum]; if (state && confirm('Clear all annotations on this page?')) { state.fabricCanvas.clear(); saveState(currentPageNum, state.fabricCanvas); } });
-    
+
     document.addEventListener('keydown', e => { if (e.key === 'v' && currentTool !== 'pan') { setActiveTool('pan'); } });
     document.addEventListener('keyup', e => { if (e.key === 'v' && currentTool === 'pan') { setActiveTool('select'); } });
 
     pdfScrollContainer.addEventListener('mousedown', e => { if (isPanMode) { isPanning = true; lastPanPoint = { x: e.clientX, y: e.clientY }; pdfScrollContainer.classList.add('panning'); } });
     document.addEventListener('mousemove', e => { if (isPanning) { const dx = e.clientX - lastPanPoint.x; const dy = e.clientY - lastPanPoint.y; pdfScrollContainer.scrollLeft -= dx; pdfScrollContainer.scrollTop -= dy; lastPanPoint = { x: e.clientX, y: e.clientY }; } });
     document.addEventListener('mouseup', () => { if (isPanning) { isPanning = false; pdfScrollContainer.classList.remove('panning'); } });
-    
+
     pdfScrollContainer.addEventListener('wheel', e => { if (e.ctrlKey) { e.preventDefault(); const delta = e.deltaY > 0 ? -0.15 : 0.15; setZoom(currentScale + delta); } }, { passive: false });
 
     // --- New, Intelligent Touch Controls ---
@@ -414,7 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
             touchState.panning = true;
             touchState.lastDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
             touchState.lastPanPoint = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
-        } 
+        }
         // A single finger touch is for panning/scrolling ONLY if a navigation tool is active.
         else if (e.touches.length === 1 && (currentTool === 'select' || currentTool === 'pan')) {
             e.preventDefault();
@@ -434,20 +434,41 @@ document.addEventListener('DOMContentLoaded', () => {
             // Handle two-finger pan and zoom gestures.
             if (touchState.pinching && e.touches.length === 2) {
                 e.preventDefault();
-                // --- Panning Logic ---
+
                 const newPanPoint = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
+                const newDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
+
+                // --- Panning Logic ---
                 const dx = newPanPoint.x - touchState.lastPanPoint.x;
                 const dy = newPanPoint.y - touchState.lastPanPoint.y;
                 pdfScrollContainer.scrollLeft -= dx;
                 pdfScrollContainer.scrollTop -= dy;
-                touchState.lastPanPoint = newPanPoint;
 
-                // --- Zooming Logic ---
-                const newDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
-                const scaleFactor = newDist / touchState.lastDist;
-                setZoom(currentScale * scaleFactor);
+                // --- Anchored Zooming Logic ---
+                if (touchState.lastDist > 0) {
+                    const scaleFactor = newDist / touchState.lastDist;
+                    const oldScale = currentScale;
+                    const newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, oldScale * scaleFactor));
+
+                    const finalScaleFactor = (oldScale > 0) ? newScale / oldScale : 1;
+
+                    if (finalScaleFactor !== 1) {
+                        const rect = pdfScrollContainer.getBoundingClientRect();
+                        const pinchPoint = { x: newPanPoint.x - rect.left, y: newPanPoint.y - rect.top };
+
+                        const newScrollLeft = (pdfScrollContainer.scrollLeft + pinchPoint.x) * finalScaleFactor - pinchPoint.x;
+                        const newScrollTop = (pdfScrollContainer.scrollTop + pinchPoint.y) * finalScaleFactor - pinchPoint.y;
+
+                        pdfScrollContainer.scrollLeft = newScrollLeft;
+                        pdfScrollContainer.scrollTop = newScrollTop;
+
+                        setZoom(newScale);
+                    }
+                }
+
                 touchState.lastDist = newDist;
-            } 
+                touchState.lastPanPoint = newPanPoint;
+            }
             // Handle single-finger panning for navigation.
             else if (touchState.singleFingerPan && e.touches.length === 1) {
                  e.preventDefault();
@@ -465,7 +486,7 @@ document.addEventListener('DOMContentLoaded', () => {
         touchState.pinching = false;
         touchState.panning = false;
         touchState.singleFingerPan = false;
-        
+
         if (lastAnimationFrame) {
             cancelAnimationFrame(lastAnimationFrame);
             lastAnimationFrame = null;
@@ -474,4 +495,3 @@ document.addEventListener('DOMContentLoaded', () => {
 
     initPDFViewer();
 });
-
