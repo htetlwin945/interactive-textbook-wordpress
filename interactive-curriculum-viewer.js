@@ -19,14 +19,31 @@ document.addEventListener('DOMContentLoaded', () => {
             box-sizing: border-box; z-index: 10; flex-shrink: 0; color: #fff;
         }
         @media (max-width: 768px) {
+            #interactive-curriculum-container {
+                flex-direction: row;
+            }
             #pdf-viewer-toolbar {
+                flex-direction: column;
                 flex-wrap: nowrap;
-                overflow-x: auto;
+                width: 65px;
+                height: 100%;
+                overflow-y: auto;
+                overflow-x: hidden;
                 justify-content: flex-start;
-                -webkit-overflow-scrolling: touch;
+                gap: 15px;
             }
             .toolbar-group {
-                flex-shrink: 0;
+                flex-direction: column;
+                border-right: none;
+                border-bottom: 1px solid #666;
+                padding: 15px 0;
+                width: 100%;
+            }
+            .toolbar-group:not(:last-child) {
+                border-right: none;
+            }
+            #floating-zoom-controls {
+                display: flex;
             }
         }
         .toolbar-group { display: flex; align-items: center; padding: 0 10px; }
