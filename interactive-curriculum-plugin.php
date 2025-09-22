@@ -3,13 +3,20 @@
  * Plugin Name: Interactive Student Curriculum
  * Plugin URI: https://example.com/interactive-curriculum-plugin
  * Description: Enables interactive PDF viewing and annotation for students.
- * Version: 3.0.10
+ * Version: 3.0.12
  * Author: Your Name
  * Author URI: https://example.com
  * License: GPLv2 or later
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
+ * = 3.0.12 =
+ * * FIX: Corrected visibility of floating zoom buttons to only appear on smaller screens.
+ * * FIX: Reinstated logic to prevent accidental selections after a two-finger pan gesture.
+ *
+ * = 3.0.11 =
+ * * UX FEAT: Replaced pinch-to-zoom on touch devices with floating zoom-in/out buttons for a more controlled experience.
+ *
  * = 3.0.10 =
  * * FIX: Resolved conflict between one-finger and two-finger touch gestures, preventing unwanted scrolling during pinch-to-zoom.
  *
@@ -340,6 +347,10 @@ class Interactive_Curriculum_Plugin {
                     <div id="page-container">
                     </div>
                 </div>
+            </div>
+            <div id="floating-zoom-controls">
+                <button id="floating-zoom-in-btn" class="floating-zoom-btn">+</button>
+                <button id="floating-zoom-out-btn" class="floating-zoom-btn">-</button>
             </div>
         </div>
         <?php
