@@ -410,6 +410,9 @@ document.addEventListener('DOMContentLoaded', () => {
         // Two-finger gestures are always for panning and zooming.
         if (e.touches.length === 2) {
             e.preventDefault();
+            // Explicitly end one-finger panning when a second finger is introduced.
+            touchState.singleFingerPan = false;
+
             touchState.pinching = true;
             touchState.panning = true;
             touchState.lastDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
