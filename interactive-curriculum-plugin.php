@@ -3,13 +3,16 @@
  * Plugin Name: Interactive Student Curriculum
  * Plugin URI: https://example.com/interactive-curriculum-plugin
  * Description: Enables interactive PDF viewing and annotation for students.
- * Version: 3.0.7
+ * Version: 3.0.8
  * Author: Your Name
  * Author URI: https://example.com
  * License: GPLv2 or later
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
+ * = 3.0.8 =
+ * * UX FEAT: Changed the default tool from "Select" to "Pan" for more intuitive initial navigation.
+ *
  * = 3.0.7 =
  * * UX FEAT: Major overhaul of touch controls for a more intuitive mobile experience.
  * * UX FEAT: One-finger touch now intelligently scrolls the document when a navigation tool (Select, Pan) is active, and draws when an annotation tool is active.
@@ -285,10 +288,10 @@ class Interactive_Curriculum_Plugin {
                 </div>
 
                 <div class="toolbar-group">
-                    <button id="select-tool-btn" class="toolbar-btn active-tool" title="Select Tool">
+                    <button id="select-tool-btn" class="toolbar-btn" title="Select Tool">
                         <svg viewBox="0 0 24 24"><path d="M13.5,4.2C13.5,4.2,13.5,4.2,13.5,4.2l-9.3,15.3h8.3l2,4.5l3.5-21.9h-4.5V4.2z"/></svg>
                     </button>
-                    <button id="pan-tool-btn" class="toolbar-btn" title="Pan Tool (V)">
+                    <button id="pan-tool-btn" class="toolbar-btn active-tool" title="Pan Tool (V)">
                         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.92 2.89a2.17 2.17 0 00-2.17-2.17A2.17 2.17 0 008.58.72a2.17 2.17 0 00-2.17 2.17v.21c0 .59.24 1.15.65 1.56l.76.76c.41.41.97.65 1.56.65h.42c.59 0 1.15-.24 1.56-.65l.76-.76c.41-.41.65-.97.65-1.56v-.21zM23 11.5c0-1.4-1.12-2.5-2.5-2.5a2.45 2.45 0 00-1.63.63L15 13.5v-1.75a2.25 2.25 0 00-2.25-2.25A2.25 2.25 0 0010.5 11.75V18c0 .83.67 1.5 1.5 1.5h6.75c.83 0 1.5-.67 1.5-1.5a1.5 1.5 0 00-1.5-1.5H18v-4.1l3.38-3.37c.37-.38.62-.89.62-1.43z"></path></svg>
                     </button>
                     <button id="freehand-tool-btn" class="toolbar-btn" title="Freehand Tool">
