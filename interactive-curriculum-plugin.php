@@ -3,13 +3,17 @@
  * Plugin Name: Interactive Student Curriculum
  * Plugin URI: https://example.com/interactive-curriculum-plugin
  * Description: Enables interactive PDF viewing and annotation for students.
- * Version: 3.0.14
+ * Version: 3.0.15
  * Author: Your Name
  * Author URI: https://example.com
  * License: GPLv2 or later
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
+ * = 3.0.15 =
+ * * UX FIX: Replaced select and pan tool icons with more intuitive mouse and hand icons.
+ * * UX FIX: Corrected the color picker swatch to display as a perfect circle.
+ *
  * = 3.0.14 =
  * * FIX: Adjusted layout of page indicator and size slider to fit the new vertical mobile toolbar.
  *
@@ -308,10 +312,10 @@ class Interactive_Curriculum_Plugin {
 
                 <div class="toolbar-group">
                     <button id="select-tool-btn" class="toolbar-btn" title="Select Tool">
-                        <svg viewBox="0 0 24 24"><path d="M13.5,4.2C13.5,4.2,13.5,4.2,13.5,4.2l-9.3,15.3h8.3l2,4.5l3.5-21.9h-4.5V4.2z"/></svg>
+                        <svg viewBox="0 0 24 24"><path d="M12.2 22.8L10.9 19H4.5c-.8 0-1.5-.7-1.5-1.5s.7-1.5 1.5-1.5h4.3l1.8-3.1L3.5 6.4c-.4-.4-.4-1 0-1.4l1.1-1.1c.4-.4 1-.4 1.4 0L12 10.1l5.5-5.5c.4-.4 1-.4 1.4 0l1.1 1.1c.4.4.4 1 0 1.4l-7.1 6.5 1.8 3.1h4.3c.8 0 1.5.7 1.5 1.5s-.7 1.5-1.5 1.5h-6.4l-1.3 3.8c-.2.5-.9.7-1.4.5s-.7-.9-.5-1.4l.7-2.4H12l.2.6z"/></svg>
                     </button>
                     <button id="pan-tool-btn" class="toolbar-btn active-tool" title="Pan Tool (V)">
-                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.92 2.89a2.17 2.17 0 00-2.17-2.17A2.17 2.17 0 008.58.72a2.17 2.17 0 00-2.17 2.17v.21c0 .59.24 1.15.65 1.56l.76.76c.41.41.97.65 1.56.65h.42c.59 0 1.15-.24 1.56-.65l.76-.76c.41-.41.65-.97.65-1.56v-.21zM23 11.5c0-1.4-1.12-2.5-2.5-2.5a2.45 2.45 0 00-1.63.63L15 13.5v-1.75a2.25 2.25 0 00-2.25-2.25A2.25 2.25 0 0010.5 11.75V18c0 .83.67 1.5 1.5 1.5h6.75c.83 0 1.5-.67 1.5-1.5a1.5 1.5 0 00-1.5-1.5H18v-4.1l3.38-3.37c.37-.38.62-.89.62-1.43z"></path></svg>
+                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M10.5 15.5c0 .8.7 1.5 1.5 1.5s1.5-.7 1.5-1.5V10c0-2.2-1.8-4-4-4s-4 1.8-4 4v7c0 1.1.9 2 2 2h1c.6 0 1-.4 1-1v-5.5c0-.8.7-1.5 1.5-1.5s1.5.7 1.5 1.5V15.5zM19.5 16H19v-5c0-2.2-1.8-4-4-4s-4 1.8-4 4v5h-.5c-.8 0-1.5.7-1.5 1.5s.7 1.5 1.5 1.5h6c.8 0 1.5-.7 1.5-1.5s-.7-1.5-1.5-1.5z"/></svg>
                     </button>
                     <button id="freehand-tool-btn" class="toolbar-btn" title="Freehand Tool">
                         <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>

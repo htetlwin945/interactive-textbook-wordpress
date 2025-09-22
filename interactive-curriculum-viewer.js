@@ -80,10 +80,11 @@ document.addEventListener('DOMContentLoaded', () => {
         .color-picker-wrapper {
             position: relative; width: 28px; height: 28px; border-radius: 50%;
             overflow: hidden; margin: 0 4px; flex-shrink: 0;
+            border: 1px solid #888;
         }
         #color-picker {
-            position: absolute; top: -4px; left: -4px; width: 36px; height: 36px;
-            border: none; background: transparent; cursor: pointer;
+            position: absolute; top: -2px; left: -2px; width: 32px; height: 32px;
+            border: none; background: transparent; cursor: pointer; padding: 0;
         }
         #color-picker::-webkit-color-swatch { border: none; border-radius: 50%; }
         #color-picker::-moz-color-swatch { border: none; border-radius: 50%; }
