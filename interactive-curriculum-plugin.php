@@ -3,13 +3,16 @@
  * Plugin Name: Interactive Student Curriculum
  * Plugin URI: https://example.com/interactive-curriculum-plugin
  * Description: Enables interactive PDF viewing and annotation for students.
- * Version: 3.0.9
+ * Version: 3.0.10
  * Author: Your Name
  * Author URI: https://example.com
  * License: GPLv2 or later
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
+ * = 3.0.10 =
+ * * FIX: Resolved conflict between one-finger and two-finger touch gestures, preventing unwanted scrolling during pinch-to-zoom.
+ *
  * = 3.0.9 =
  * * FIX: Prevented accidental object selection on touch devices after a two-finger pinch-to-zoom gesture.
  *
