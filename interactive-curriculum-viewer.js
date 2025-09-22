@@ -42,6 +42,21 @@ document.addEventListener('DOMContentLoaded', () => {
             .toolbar-group:not(:last-child) {
                 border-right: none;
             }
+            .page-info {
+                flex-direction: column;
+                gap: 4px;
+            }
+            #page-input {
+                width: 45px;
+            }
+            #size-slider {
+                -webkit-appearance: slider-vertical;
+                writing-mode: bt-lr;
+                width: 8px;
+                height: 100px;
+                padding: 0 5px;
+                margin: 10px 0;
+            }
             #floating-zoom-controls {
                 display: flex;
             }

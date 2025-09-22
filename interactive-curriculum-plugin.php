@@ -3,13 +3,16 @@
  * Plugin Name: Interactive Student Curriculum
  * Plugin URI: https://example.com/interactive-curriculum-plugin
  * Description: Enables interactive PDF viewing and annotation for students.
- * Version: 3.0.13
+ * Version: 3.0.14
  * Author: Your Name
  * Author URI: https://example.com
  * License: GPLv2 or later
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
+ * = 3.0.14 =
+ * * FIX: Adjusted layout of page indicator and size slider to fit the new vertical mobile toolbar.
+ *
  * = 3.0.13 =
  * * UX FEAT: Redesigned toolbar to be vertical on the left side for mobile/tablet devices for improved usability.
  *
