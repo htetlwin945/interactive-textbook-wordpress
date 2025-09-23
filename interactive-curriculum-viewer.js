@@ -277,7 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);
                     const rgb = result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '255, 255, 0';
                     canvas.freeDrawingBrush.color = (toolName === 'highlight') ? `rgba(${rgb}, 0.4)` : color;
-                    canvas.freeDrawingBrush.width = parseInt(sizeSlider.value, 10);
+                    canvas.freeDrawingBrush.width = parseInt(sizeSlider.value, 10) * (window.devicePixelRatio || 1);
                 }
             }
         });
@@ -287,7 +287,13 @@ document.addEventListener('DOMContentLoaded', () => {
         fabricCanvas.on({ 'object:added': () => saveState(pageNum, fabricCanvas), 'object:modified': () => saveState(pageNum, fabricCanvas), 'object:removed': () => saveState(pageNum, fabricCanvas) });
         fabricCanvas.on('mouse:down', (opt) => {
             if (currentTool === 'text-note' && !opt.target) {
-                const text = new fabric.IText('Type here...', { left: opt.pointer.x, top: opt.pointer.y, fontSize: 18 / currentScale, fill: colorPicker.value });
+                const devicePixelRatio = window.devicePixelRatio || 1;
+                const text = new fabric.IText('Type here...', {
+                    left: opt.pointer.x,
+                    top: opt.pointer.y,
+                    fontSize: 18 * devicePixelRatio / currentScale,
+                    fill: colorPicker.value
+                });
                 fabricCanvas.add(text);
                 setActiveTool('select');
             }
@@ -332,10 +338,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!pageDiv.hasAttribute('data-rendered') || !pdfDoc) return;
 
         const page = await pdfDoc.getPage(pageNum);
-        const viewport = page.getViewport({ scale: currentScale });
 
-        pageDiv.style.width = `${viewport.width}px`;
-        pageDiv.style.height = `${viewport.height}px`;
+        // --- High-DPI Rendering ---
+        const devicePixelRatio = window.devicePixelRatio || 1;
+        const viewport = page.getViewport({ scale: currentScale * devicePixelRatio });
+
+        pageDiv.style.width = `${viewport.width / devicePixelRatio}px`;
+        pageDiv.style.height = `${viewport.height / devicePixelRatio}px`;
 
         const pdfCanvas = pageDiv.querySelector('.pdf-canvas');
         pdfCanvas.width = viewport.width;
@@ -343,9 +352,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const fabricCanvas = pageStates[pageNum].fabricCanvas;
         fabricCanvas.setDimensions({ width: viewport.width, height: viewport.height });
-        fabricCanvas.setZoom(currentScale);
+        fabricCanvas.setZoom(currentScale * devicePixelRatio);
 
-        await page.render({ canvasContext: pdfCanvas.getContext('2d'), viewport }).promise;
+        const canvasContext = pdfCanvas.getContext('2d');
+        canvasContext.scale(devicePixelRatio, devicePixelRatio);
+
+        await page.render({ canvasContext, viewport }).promise;
         fabricCanvas.renderAll();
     }
 
