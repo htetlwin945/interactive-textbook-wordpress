@@ -3,13 +3,16 @@
  * Plugin Name: Interactive Student Curriculum
  * Plugin URI: https://example.com/interactive-curriculum-plugin
  * Description: Enables interactive PDF viewing and annotation for students.
- * Version: 3.0.15
+ * Version: 3.0.16
  * Author: Your Name
  * Author URI: https://example.com
  * License: GPLv2 or later
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
+ * = 3.0.16 =
+ * * FIX: Improved initial PDF rendering on high-DPI (Retina) and touch screen devices to be sharper and less blurry.
+ *
  * = 3.0.15 =
  * * UX FIX: Replaced select and pan tool icons with more intuitive mouse and hand icons.
  * * UX FIX: Corrected the color picker swatch to display as a perfect circle.
