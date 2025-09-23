@@ -401,6 +401,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         const pageNum = parseInt(entry.target.dataset.pageNumber, 10);
                         currentPageNum = pageNum;
                         pageInput.value = pageNum;
+                        updateUndoRedoButtons(); // Update buttons for the new page's history
                         debouncedSaveLastPage(pageNum);
                         thumbnailElements.forEach(thumb => thumb.classList.remove('active'));
                         const activeThumb = thumbnailView.querySelector(`[data-page-num-thumb="${pageNum}"]`);
@@ -438,6 +439,10 @@ document.addEventListener('DOMContentLoaded', () => {
             const initialPageDiv = pageElements[initialPage - 1];
             if (initialPageDiv) {
                 initialPageDiv.scrollIntoView({ behavior: 'auto', block: 'start' });
+                // Manually set the initial page number in the input and state,
+                // as the IntersectionObserver may not fire on initial load.
+                pageInput.value = initialPage;
+                currentPageNum = initialPage;
             }
         } catch (reason) {
             console.error('Error loading PDF:', reason);
