@@ -3,76 +3,31 @@
  * Plugin Name: Interactive Student Curriculum
  * Plugin URI: https://example.com/interactive-curriculum-plugin
  * Description: Enables interactive PDF viewing and annotation for students.
- * Version: 3.0.17
+ * Version: 3.0.19
  * Author: Your Name
  * Author URI: https://example.com
  * License: GPLv2 or later
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
- * = 3.0.17 =
+ * = 3.0.19 =
+ * * FIX: Rolled back initial PDF rendering logic to a more stable version to prevent loading errors on some devices.
+ * * FIX: Fully disabled pinch-to-zoom gesture, which was still active and conflicting with two-finger panning.
+ *
+ * = 3.0.18 =
+ * * UX FEAT: Redesigned toolbar to be vertical on the left for mobile/tablet devices.
+ * * UX FEAT: Replaced pinch-to-zoom on touch devices with floating zoom-in/out buttons.
  * * UX FIX: Updated toolbar icons for Select, Pan, Draw, Highlight, and Text tools for better clarity.
- *
- * = 3.0.16 =
- * * FIX: Improved initial PDF rendering on high-DPI (Retina) and touch screen devices to be sharper and less blurry.
- *
- * = 3.0.15 =
- * * UX FIX: Replaced select and pan tool icons with more intuitive mouse and hand icons.
- * * UX FIX: Corrected the color picker swatch to display as a perfect circle.
- *
- * = 3.0.14 =
- * * FIX: Adjusted layout of page indicator and size slider to fit the new vertical mobile toolbar.
- *
- * = 3.0.13 =
- * * UX FEAT: Redesigned toolbar to be vertical on the left side for mobile/tablet devices for improved usability.
- *
- * = 3.0.12 =
- * * FIX: Corrected visibility of floating zoom buttons to only appear on smaller screens.
- * * FIX: Reinstated logic to prevent accidental selections after a two-finger pan gesture.
- *
- * = 3.0.11 =
- * * UX FEAT: Replaced pinch-to-zoom on touch devices with floating zoom-in/out buttons for a more controlled experience.
- *
- * = 3.0.10 =
- * * FIX: Resolved conflict between one-finger and two-finger touch gestures, preventing unwanted scrolling during pinch-to-zoom.
- *
- * = 3.0.9 =
- * * FIX: Prevented accidental object selection on touch devices after a two-finger pinch-to-zoom gesture.
- *
- * = 3.0.8 =
- * * UX FEAT: Changed the default tool from "Select" to "Pan" for more intuitive initial navigation.
+ * * UX FIX: Changed the default tool from "Select" to "Pan" for more intuitive initial navigation.
+ * * FIX: Resolved conflicts between one-finger and two-finger touch gestures.
+ * * FIX: Prevented accidental object selection on touch devices after a gesture.
+ * * FIX: Adjusted layout of toolbar controls (page indicator, size slider) to fit new vertical layout.
  *
  * = 3.0.7 =
+ * * NOTE: Previous versions below this point are condensed. This version represents the start of a major UX overhaul.
  * * UX FEAT: Major overhaul of touch controls for a more intuitive mobile experience.
  * * UX FEAT: One-finger touch now intelligently scrolls the document when a navigation tool (Select, Pan) is active, and draws when an annotation tool is active.
  * * UX FEAT: Two-finger gestures (pinch-to-zoom, pan) are now always available, regardless of the selected tool.
- *
- * = 3.0.6 =
- * * FEAT: Enabled smooth, one-finger scrolling on touch devices.
- * * PERF: Optimized touch gestures (two-finger pan & zoom) for a smoother experience using requestAnimationFrame.
- *
- * = 3.0.5 =
- * * FEAT: Added a dedicated "Pan" tool to the toolbar for easier navigation on all devices.
- * * FEAT: Implemented page thumbnail previews in the sidebar for quick navigation.
- * * FIX: Implemented robust touch controls for smooth pinch-to-zoom and panning on mobile devices.
- * * FIX: Made toolbar responsive and horizontally scrollable on mobile to ensure all buttons are accessible.
- *
- * = 3.0.4 =
- * * CRITICAL FIX: Corrected a typo ('unedo' instead of 'undo') that was halting script execution and preventing PDFs from loading.
- *
- * = 3.0.3 =
- * * CRITICAL FIX: Restored all data saving functions (annotations, last-read page).
- * * FIX: Resolved an issue causing the PDF to load from the last page instead of the correct one.
- * * FIX: Re-integrated all features from v2.9.0 to create a stable, complete version.
- * * = 3.0.2 =
- * * CRITICAL FIX: Resolved annotation alignment issues during zoom. Annotations now stay perfectly synchronized with the PDF content.
- * * FIX: The initial PDF view now loads at a correct "fit-to-width" scale instead of appearing shrunken.
- * * FIX: Restored the "Saving..." indicator that provides feedback when annotations are saved.
- *
- * = 3.0.1 =
- * * CRITICAL FIX: Resolved a regression where essential functions were missing, preventing PDFs from loading.
- * * = 3.0.0 =
- * * MAJOR FEAT: Implemented advanced zoom and pan functionality.
  */
 
 if (!defined('ABSPATH')) {
@@ -84,7 +39,7 @@ if (!defined('ABSPATH')) {
 function interactive_curriculum_activate() {
     global $wpdb;
     $table_name = $wpdb->prefix . 'icp_annotations';
-    
+
     $charset_collate = $wpdb->get_charset_collate();
 
     $sql = "CREATE TABLE $table_name (
@@ -162,7 +117,7 @@ function interactive_curriculum_save_annotations(WP_REST_Request $request) {
     $user_id = get_current_user_id();
     $document_id = sanitize_text_field($request->get_param('document_id'));
     $page_num = (int)$request->get_param('page_num');
-    
+
     $annotations_data = $request->get_body();
 
     if (empty($user_id) || empty($document_id) || empty($page_num)) {
@@ -270,14 +225,14 @@ class Interactive_Curriculum_Plugin {
 
         $pdf_url = esc_url($atts['pdf_url']);
         $document_id = sanitize_text_field($atts['document_id']);
-        
+
         if (empty($pdf_url) || empty($document_id)) {
             return '<p>Error: Missing PDF URL or Document ID in shortcode.</p>';
         }
 
         $user_id = get_current_user_id();
         $initial_page = (int) get_user_meta($user_id, 'icp_last_page_' . $document_id, true) ?: 1;
-        
+
         $initial_color = get_user_meta($user_id, 'icp_last_color', true) ?: '#FF0000';
         $initial_color = sanitize_hex_color($initial_color);
 
@@ -333,7 +288,7 @@ class Interactive_Curriculum_Plugin {
                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256"><path d="M208,56V88a8,8,0,0,1-16,0V64H136V192h24a8,8,0,0,1,0,16H96a8,8,0,0,1,0-16h24V64H64V88a8,8,0,0,1-16,0V56a8,8,0,0,1,8-8H200A8,8,0,0,1,208,56Z"></path></svg>
                     </button>
                 </div>
-                
+
                 <div class="toolbar-group">
                     <div class="color-picker-wrapper">
                          <input type="color" id="color-picker" value="<?php echo esc_attr($initial_color); ?>" title="Annotation Color">
