@@ -3,17 +3,13 @@
  * Plugin Name: Interactive Student Curriculum
  * Plugin URI: https://example.com/interactive-curriculum-plugin
  * Description: Enables interactive PDF viewing and annotation for students.
- * Version: 4.0.0
+ * Version: 3.0.21
  * Author: Your Name
  * Author URI: https://example.com
  * License: GPLv2 or later
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
- * = 4.0.0 =
- * * MAJOR: Refactored the entire JavaScript codebase from a single file into modern ES6 modules (PDFViewer, ToolbarManager, AnnotationEngine). This improves maintainability and extensibility.
- * * DEV: Removed the webpack build process in favor of loading ES modules directly in the browser.
- *
  * = 3.0.21 =
  * * PERF: Implemented lazy rendering for PDF pages. Now, when zooming or scrolling, only the pages currently visible in the viewport are re-rendered, significantly improving performance.
  *
@@ -191,16 +187,6 @@ function interactive_curriculum_get_annotations(WP_REST_Request $request) {
     }
 }
 
-// Add type="module" to the script tag for our main script.
-function interactive_curriculum_add_module_type($tag, $handle, $src) {
-    if ('interactive-curriculum-viewer' === $handle) {
-        // Reconstruct the script tag with type="module". Note the 'id' attribute handling.
-        $tag = '<script type="module" src="' . esc_url($src) . '" id="' . $handle . '-js"></script>';
-    }
-    return $tag;
-}
-add_filter('script_loader_tag', 'interactive_curriculum_add_module_type', 10, 3);
-
 class Interactive_Curriculum_Plugin {
 
     public function __construct() {
@@ -218,9 +204,9 @@ class Interactive_Curriculum_Plugin {
 
         wp_enqueue_script(
             'interactive-curriculum-viewer',
-            plugins_url('src/index.js', __FILE__),
-            array('pdfjs', 'fabricjs'), // No longer using jQuery
-            filemtime(plugin_dir_path(__FILE__) . 'src/index.js'),
+            plugins_url('interactive-curriculum-viewer.js', __FILE__),
+            array('jquery', 'pdfjs', 'fabricjs'),
+            filemtime(plugin_dir_path(__FILE__) . 'interactive-curriculum-viewer.js'),
             true
         );
 
