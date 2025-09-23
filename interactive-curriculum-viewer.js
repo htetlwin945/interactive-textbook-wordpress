@@ -277,7 +277,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(color);
                     const rgb = result ? `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : '255, 255, 0';
                     canvas.freeDrawingBrush.color = (toolName === 'highlight') ? `rgba(${rgb}, 0.4)` : color;
-                    canvas.freeDrawingBrush.width = parseInt(sizeSlider.value, 10) * (window.devicePixelRatio || 1);
+                    canvas.freeDrawingBrush.width = parseInt(sizeSlider.value, 10);
                 }
             }
         });
@@ -287,13 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
         fabricCanvas.on({ 'object:added': () => saveState(pageNum, fabricCanvas), 'object:modified': () => saveState(pageNum, fabricCanvas), 'object:removed': () => saveState(pageNum, fabricCanvas) });
         fabricCanvas.on('mouse:down', (opt) => {
             if (currentTool === 'text-note' && !opt.target) {
-                const devicePixelRatio = window.devicePixelRatio || 1;
-                const text = new fabric.IText('Type here...', {
-                    left: opt.pointer.x,
-                    top: opt.pointer.y,
-                    fontSize: 18 * devicePixelRatio / currentScale,
-                    fill: colorPicker.value
-                });
+                const text = new fabric.IText('Type here...', { left: opt.pointer.x, top: opt.pointer.y, fontSize: 18 / currentScale, fill: colorPicker.value });
                 fabricCanvas.add(text);
                 setActiveTool('select');
             }
@@ -338,13 +332,10 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!pageDiv.hasAttribute('data-rendered') || !pdfDoc) return;
 
         const page = await pdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: currentScale });
 
-        // --- High-DPI Rendering ---
-        const devicePixelRatio = window.devicePixelRatio || 1;
-        const viewport = page.getViewport({ scale: currentScale * devicePixelRatio });
-
-        pageDiv.style.width = `${viewport.width / devicePixelRatio}px`;
-        pageDiv.style.height = `${viewport.height / devicePixelRatio}px`;
+        pageDiv.style.width = `${viewport.width}px`;
+        pageDiv.style.height = `${viewport.height}px`;
 
         const pdfCanvas = pageDiv.querySelector('.pdf-canvas');
         pdfCanvas.width = viewport.width;
@@ -352,12 +343,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const fabricCanvas = pageStates[pageNum].fabricCanvas;
         fabricCanvas.setDimensions({ width: viewport.width, height: viewport.height });
-        fabricCanvas.setZoom(currentScale * devicePixelRatio);
+        fabricCanvas.setZoom(currentScale);
 
-        const canvasContext = pdfCanvas.getContext('2d');
-        canvasContext.scale(devicePixelRatio, devicePixelRatio);
-
-        await page.render({ canvasContext, viewport }).promise;
+        await page.render({ canvasContext: pdfCanvas.getContext('2d'), viewport }).promise;
         fabricCanvas.renderAll();
     }
 
@@ -424,27 +412,28 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }, { root: pdfScrollContainer, threshold: 0.5 });
 
+            // --- Page Creation and Initial Sizing ---
+            // Reverted to a more stable, fixed-scale initialization to prevent rendering bugs.
+            // The previous "fit-to-width" logic was causing some PDFs to fail loading.
+            currentScale = 1.0;
             const firstPage = await pdfDoc.getPage(1);
-            const viewport = firstPage.getViewport({ scale: 1.0 });
-            const pageWidth = pdfScrollContainer.clientWidth - 40;
-            currentScale = pageWidth / viewport.width;
+            const initialViewport = firstPage.getViewport({ scale: currentScale });
 
             for (let i = 1; i <= pdfDoc.numPages; i++) {
                 const pageDiv = document.createElement('div');
                 pageDiv.className = 'pdf-page-container';
                 pageDiv.dataset.pageNumber = i;
+
+                // Set placeholder size
+                pageDiv.style.width = `${initialViewport.width}px`;
+                pageDiv.style.height = `${initialViewport.height}px`;
+
                 pageContainer.appendChild(pageDiv);
                 pageElements.push(pageDiv);
 
                 pageRenderObserver.observe(pageDiv);
                 pageNumObserver.observe(pageDiv);
             }
-
-            pageElements.forEach(pageDiv => {
-                const pageRatio = viewport.height / viewport.width;
-                pageDiv.style.width = `${pageWidth}px`;
-                pageDiv.style.height = `${pageWidth * pageRatio}px`;
-            });
 
             const initialPageDiv = pageElements[initialPage - 1];
             if (initialPageDiv) {
@@ -492,8 +481,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Explicitly end one-finger panning when a second finger is introduced.
             touchState.singleFingerPan = false;
 
-            touchState.pinching = false; // Pinch is disabled
-            touchState.panning = true; // This flag is for two-finger pan
+            touchState.pinching = true;
+            touchState.panning = true;
+            touchState.lastDist = Math.hypot(e.touches[0].pageX - e.touches[1].pageX, e.touches[0].pageY - e.touches[1].pageY);
             touchState.lastPanPoint = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
 
             // Prevent accidental selection by disabling canvas selection during pinch
@@ -520,11 +510,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         lastAnimationFrame = requestAnimationFrame(() => {
-            // Handle two-finger pan gesture.
-            if (touchState.panning && e.touches.length === 2) {
+            // Handle two-finger pan and zoom gestures.
+            if (touchState.pinching && e.touches.length === 2) {
                 e.preventDefault();
 
                 const newPanPoint = { x: (e.touches[0].clientX + e.touches[1].clientX) / 2, y: (e.touches[0].clientY + e.touches[1].clientY) / 2 };
+                // Pinch-to-zoom is disabled. This gesture now only pans.
 
                 // --- Panning Logic ---
                 const dx = newPanPoint.x - touchState.lastPanPoint.x;
