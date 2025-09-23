@@ -210,13 +210,51 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- UTILITY & CORE FUNCTIONS ---
     function debounce(func, delay) { let timeout; return function(...args) { clearTimeout(timeout); timeout = setTimeout(() => func.apply(this, args), delay); }; }
+    function isElementInViewport(el) {
+        if (!el || typeof el.getBoundingClientRect !== 'function') return false;
+        const rect = el.getBoundingClientRect();
+        const containerRect = pdfScrollContainer.getBoundingClientRect();
+
+        // Check for a valid rectangle
+        if (rect.width === 0 && rect.height === 0) return false;
+
+        // Check if the element is within the vertical and horizontal viewport of the container
+        return (
+            rect.top < containerRect.bottom &&
+            rect.bottom > containerRect.top &&
+            rect.left < containerRect.right &&
+            rect.right > containerRect.left
+        );
+    }
     function toggleFullScreen() { if (!document.fullscreenElement) { container.requestFullscreen(); } else { document.exitFullscreen(); } }
 
-    const debouncedUpdateAllPages = debounce(() => {
-        pageElements.forEach(pageDiv => { if (pageDiv.hasAttribute('data-rendered')) { updatePageRender(pageDiv); } });
-    }, 100);
+    const debouncedRenderVisiblePages = debounce(() => {
+        pageElements.forEach(pageDiv => {
+            if (pageDiv.hasAttribute('data-rendered') && isElementInViewport(pageDiv)) {
+                renderPdfOnCanvas(pageDiv);
+            }
+        });
+    }, 150);
 
-    function setZoom(newScale) { currentScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale)); debouncedUpdateAllPages(); }
+    function setZoom(newScale) {
+        currentScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale));
+
+        // When zoom changes, the actual PDF content of all pages needs to be re-rendered.
+        // We delete the 'renderedScale' attribute so the lazy loader knows they are stale.
+        pageElements.forEach(pageDiv => {
+            delete pageDiv.dataset.renderedScale;
+        });
+
+        // First, update the structure of all pages quickly. This resizes containers and canvases.
+        pageElements.forEach(pageDiv => {
+            if (pageDiv.hasAttribute('data-rendered')) {
+                updatePageStructure(pageDiv);
+            }
+        });
+
+        // Then, render only the pages that are now visible after a short delay.
+        debouncedRenderVisiblePages();
+    }
 
     // --- ANNOTATION & DATA LOGIC ---
     async function saveLastPage(pageNum) { if (!documentId || !pageNum) return; try { await fetch(`${interactiveCurriculumData.restUrl}interactive-curriculum/v2/last-page`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': interactiveCurriculumData.nonce }, body: JSON.stringify({ document_id: documentId, page_num: pageNum }) }); } catch (error) { console.error('Error saving last page:', error); } }
@@ -327,33 +365,63 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    async function updatePageRender(pageDiv) {
+    // --- LAZY RENDERING REFACTOR ---
+    // This function only updates the size of the page container and canvases. It's fast.
+    function updatePageStructure(pageDiv) {
         const pageNum = parseInt(pageDiv.dataset.pageNumber, 10);
-        if (!pageDiv.hasAttribute('data-rendered') || !pdfDoc) return;
+        const pageState = pageStates[pageNum];
+        if (!pageState || !pageState.baseViewport) return;
 
-        const page = await pdfDoc.getPage(pageNum);
-        const viewport = page.getViewport({ scale: currentScale });
+        const viewport = pageState.baseViewport.clone({ scale: currentScale });
 
         pageDiv.style.width = `${viewport.width}px`;
         pageDiv.style.height = `${viewport.height}px`;
 
         const pdfCanvas = pageDiv.querySelector('.pdf-canvas');
-        pdfCanvas.width = viewport.width;
-        pdfCanvas.height = viewport.height;
+        if (pdfCanvas) {
+            pdfCanvas.width = viewport.width;
+            pdfCanvas.height = viewport.height;
+        }
 
-        const fabricCanvas = pageStates[pageNum].fabricCanvas;
-        fabricCanvas.setDimensions({ width: viewport.width, height: viewport.height });
-        fabricCanvas.setZoom(currentScale);
-
-        await page.render({ canvasContext: pdfCanvas.getContext('2d'), viewport }).promise;
-        fabricCanvas.renderAll();
+        const fabricCanvas = pageState.fabricCanvas;
+        if (fabricCanvas) {
+            fabricCanvas.setDimensions({ width: viewport.width, height: viewport.height });
+            fabricCanvas.setZoom(currentScale);
+            fabricCanvas.renderAll();
+        }
     }
+
+    // This function renders the actual PDF content onto the canvas. It's slow.
+    async function renderPdfOnCanvas(pageDiv) {
+        const pageNum = parseInt(pageDiv.dataset.pageNumber, 10);
+        const pageState = pageStates[pageNum];
+        const pdfCanvas = pageDiv.querySelector('.pdf-canvas');
+
+        // Don't re-render if it's already rendered at the current scale or is currently rendering
+        if (!pageState || !pageState.page || !pdfCanvas || pageDiv.dataset.renderedScale === String(currentScale) || pageDiv.hasAttribute('data-pdf-rendering')) {
+            return;
+        }
+
+        const viewport = pageState.baseViewport.clone({ scale: currentScale });
+
+        pageDiv.setAttribute('data-pdf-rendering', 'true');
+        try {
+            await pageState.page.render({ canvasContext: pdfCanvas.getContext('2d'), viewport }).promise;
+            pageDiv.dataset.renderedScale = String(currentScale);
+        } catch (error) {
+            console.error(`Error rendering page ${pageNum}`, error);
+        } finally {
+            pageDiv.removeAttribute('data-pdf-rendering');
+        }
+    }
+    // --- END LAZY RENDERING REFACTOR ---
 
     async function renderInitialPage(pageDiv) {
         if (pageDiv.hasAttribute('data-rendered')) return;
         const pageNum = parseInt(pageDiv.dataset.pageNumber, 10);
         try {
             const page = await pdfDoc.getPage(pageNum);
+            const baseViewport = page.getViewport({ scale: 1.0 });
 
             const pdfCanvas = document.createElement('canvas');
             pdfCanvas.className = 'pdf-canvas';
@@ -364,10 +432,20 @@ document.addEventListener('DOMContentLoaded', () => {
             pageDiv.appendChild(annotationCanvasEl);
 
             const fabricCanvas = new fabric.Canvas(annotationCanvasEl);
-            pageStates[pageNum] = { fabricCanvas, history: [], redoStack: [] };
+            pageStates[pageNum] = {
+                fabricCanvas,
+                history: [],
+                redoStack: [],
+                page, // Store the page object
+                baseViewport // Store the viewport at scale 1.0
+            };
 
             pageDiv.setAttribute('data-rendered', 'true');
-            await updatePageRender(pageDiv);
+
+            // Use the new refactored functions for the initial render
+            updatePageStructure(pageDiv);
+            await renderPdfOnCanvas(pageDiv);
+
             await loadAnnotations(pageNum, fabricCanvas);
             attachAnnotationListeners(fabricCanvas, pageNum);
         } catch(error) {
@@ -475,6 +553,9 @@ document.addEventListener('DOMContentLoaded', () => {
     document.addEventListener('mouseup', () => { if (isPanning) { isPanning = false; pdfScrollContainer.classList.remove('panning'); } });
 
     pdfScrollContainer.addEventListener('wheel', e => { if (e.ctrlKey) { e.preventDefault(); const delta = e.deltaY > 0 ? -0.15 : 0.15; setZoom(currentScale + delta); } }, { passive: false });
+
+    // Lazy render pages on scroll
+    pdfScrollContainer.addEventListener('scroll', debouncedRenderVisiblePages);
 
     // --- New, Intelligent Touch Controls ---
     let lastAnimationFrame = null;

@@ -3,13 +3,16 @@
  * Plugin Name: Interactive Student Curriculum
  * Plugin URI: https://example.com/interactive-curriculum-plugin
  * Description: Enables interactive PDF viewing and annotation for students.
- * Version: 3.0.20
+ * Version: 3.0.21
  * Author: Your Name
  * Author URI: https://example.com
  * License: GPLv2 or later
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
+ * = 3.0.21 =
+ * * PERF: Implemented lazy rendering for PDF pages. Now, when zooming or scrolling, only the pages currently visible in the viewport are re-rendered, significantly improving performance.
+ *
  * = 3.0.20 =
  * * FIX: Undo/Redo buttons now correctly update their state when scrolling between pages.
  * * FIX: The page number indicator in the toolbar now correctly shows the current page on initial load.
