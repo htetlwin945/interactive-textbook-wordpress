@@ -3,13 +3,17 @@
  * Plugin Name: Interactive Student Curriculum
  * Plugin URI: https://example.com/interactive-curriculum-plugin
  * Description: Enables interactive PDF viewing and annotation for students.
- * Version: 3.0.19
+ * Version: 3.0.20
  * Author: Your Name
  * Author URI: https://example.com
  * License: GPLv2 or later
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
+ * = 3.0.20 =
+ * * FIX: Undo/Redo buttons now correctly update their state when scrolling between pages.
+ * * FIX: The page number indicator in the toolbar now correctly shows the current page on initial load.
+ *
  * = 3.0.19 =
  * * FIX: Rolled back initial PDF rendering logic to a more stable version to prevent loading errors on some devices.
  * * FIX: Fully disabled pinch-to-zoom gesture, which was still active and conflicting with two-finger panning.
