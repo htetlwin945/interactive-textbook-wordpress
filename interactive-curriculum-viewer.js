@@ -162,11 +162,12 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- END FABRIC.JS CUSTOMIZATION ---
 
     // --- DOM ELEMENT REFERENCES ---
-    const isReadOnly = typeof interactiveCurriculumReadOnlyData !== 'undefined';
-    const pdfUrl = isReadOnly ? interactiveCurriculumReadOnlyData.pdfUrl : container.dataset.pdfUrl;
-    const documentId = isReadOnly ? interactiveCurriculumReadOnlyData.documentId : container.dataset.documentId;
-    const studentId = isReadOnly ? interactiveCurriculumReadOnlyData.studentId : null;
-    const initialPage = isReadOnly ? interactiveCurriculumReadOnlyData.initialPage : (parseInt(container.dataset.initialPage, 10) || 1);
+    const data = window.interactiveCurriculumData || {};
+    const isReadOnly = data.isReadOnly || false;
+    const pdfUrl = data.pdfUrl || container.dataset.pdfUrl;
+    const documentId = data.documentId || container.dataset.documentId;
+    const studentId = data.studentId || null;
+    const initialPage = data.initialPage || (parseInt(container.dataset.initialPage, 10) || 1);
     const prevPageBtn = document.getElementById('prev-page-btn');
     const nextPageBtn = document.getElementById('next-page-btn');
     const fullscreenBtn = document.getElementById('fullscreen-btn');
@@ -272,16 +273,16 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateUndoRedoButtons() { const state = pageStates[currentPageNum]; undoBtn.disabled = !state || state.history.length <= 1; redoBtn.disabled = !state || state.redoStack.length === 0; }
 
     async function loadAnnotations(pageNum, fabricCanvas) {
-        let url = `${interactiveCurriculumData.restUrl}interactive-curriculum/v2/annotations/${documentId}/${pageNum}`;
+        let url = `${data.restUrl}interactive-curriculum/v2/annotations/${documentId}/${pageNum}`;
         if (isReadOnly && studentId) {
             url += `?student_id=${studentId}`;
         }
         try {
-            const response = await fetch(url, { headers: { 'X-WP-Nonce': interactiveCurriculumData.nonce } });
+            const response = await fetch(url, { headers: { 'X-WP-Nonce': data.nonce } });
             if (response.ok) {
-                const data = await response.json();
-                if (data && data.objects && data.objects.length > 0) {
-                    fabricCanvas.loadFromJSON(data, () => {
+                const resData = await response.json();
+                if (resData && resData.objects && resData.objects.length > 0) {
+                    fabricCanvas.loadFromJSON(resData, () => {
                         fabricCanvas.setZoom(currentScale);
                         fabricCanvas.renderAll();
                     });

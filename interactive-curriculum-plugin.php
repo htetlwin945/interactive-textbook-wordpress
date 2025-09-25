@@ -456,10 +456,8 @@ class Interactive_Curriculum_Plugin {
 
         // Save enrolled students
         if (isset($_POST['icp_enrolled_students'])) {
-            // Sanitize as integers, then cast to strings for reliable LIKE query
             $student_ids = array_map('intval', $_POST['icp_enrolled_students']);
-            $student_ids_as_strings = array_map('strval', $student_ids);
-            update_post_meta($post_id, '_icp_enrolled_students', $student_ids_as_strings);
+            update_post_meta($post_id, '_icp_enrolled_students', $student_ids);
         } else {
             delete_post_meta($post_id, '_icp_enrolled_students');
         }
@@ -468,13 +466,23 @@ class Interactive_Curriculum_Plugin {
     public function enqueue_admin_scripts($hook) {
         global $post;
         if ($hook == 'post-new.php' || $hook == 'post.php') {
-            if (isset($post->post_type) && ($post->post_type === 'icp_book' || $post->post_type === 'icp_class')) {
+            if (isset($post->post_type) && $post->post_type === 'icp_book') {
                 wp_enqueue_media();
+                wp_enqueue_script('pdfjs', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js', array(), '2.11.338', true);
                 wp_enqueue_script(
-                    'icp-admin-script',
-                    plugins_url('icp-admin-script.js', __FILE__),
+                    'icp-book-admin-script',
+                    plugins_url('icp-book-admin.js', __FILE__),
+                    array('jquery', 'pdfjs'),
+                    filemtime(plugin_dir_path(__FILE__) . 'icp-book-admin.js'),
+                    true
+                );
+            }
+            if (isset($post->post_type) && $post->post_type === 'icp_class') {
+                 wp_enqueue_script(
+                    'icp-class-admin-script',
+                    plugins_url('icp-class-admin.js', __FILE__),
                     array('jquery'),
-                    filemtime(plugin_dir_path(__FILE__) . 'icp-admin-script.js'),
+                    filemtime(plugin_dir_path(__FILE__) . 'icp-class-admin.js'),
                     true
                 );
             }
@@ -531,8 +539,8 @@ class Interactive_Curriculum_Plugin {
             'meta_query' => array(
                 array(
                     'key'     => '_icp_enrolled_students',
-                    'value'   => '"' . strval($user_id) . '"',
-                    'compare' => 'LIKE',
+                    'value'   => $user_id,
+                    'compare' => '=',
                 ),
             )
         ));
@@ -743,16 +751,19 @@ class Interactive_Curriculum_Plugin {
 
         // Localize script with data for read-only mode
         $pdf_url = get_post_meta($book_id, '_icp_pdf_url', true);
+        $data = array(
+            'restUrl' => get_rest_url(),
+            'nonce' => wp_create_nonce('wp_rest'),
+            'pdfUrl' => esc_url($pdf_url),
+            'documentId' => $book_id,
+            'studentId' => $student_id,
+            'isReadOnly' => true,
+            'initialPage' => (int) get_user_meta($student_id, 'icp_last_page_' . $book_id, true) ?: 1,
+        );
         wp_localize_script(
             'interactive-curriculum-viewer',
-            'interactiveCurriculumReadOnlyData',
-            array(
-                'pdfUrl' => esc_url($pdf_url),
-                'documentId' => $book_id,
-                'studentId' => $student_id,
-                'isReadOnly' => true,
-                'initialPage' => (int) get_user_meta($student_id, 'icp_last_page_' . $book_id, true) ?: 1,
-            )
+            'interactiveCurriculumData',
+            $data
         );
 
         ?>
