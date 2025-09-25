@@ -3,13 +3,20 @@
  * Plugin Name: Interactive Student Curriculum
  * Plugin URI: https://example.com/interactive-curriculum-plugin
  * Description: Enables interactive PDF viewing and annotation for students.
- * Version: 3.0.21
+ * Version: 3.1.0
  * Author: Your Name
  * Author URI: https://example.com
  * License: GPLv2 or later
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
+ * = 3.1.0 =
+ * * FEAT: Implemented a full access control system for educational materials.
+ * * FEAT: Added "Book" and "Class" Custom Post Types (CPTs).
+ * * FEAT: Added a "Student" user role upon plugin activation.
+ * * FEAT: Admins can now upload PDFs to "Books", assign "Books" to "Classes", and enroll "Students" in "Classes".
+ * * FEAT: The `[interactive_curriculum_pdf]` shortcode now enforces that students can only view books for classes they are enrolled in.
+ *
  * = 3.0.21 =
  * * PERF: Implemented lazy rendering for PDF pages. Now, when zooming or scrolling, only the pages currently visible in the viewport are re-rendered, significantly improving performance.
  *
