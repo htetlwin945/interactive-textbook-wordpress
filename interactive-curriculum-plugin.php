@@ -56,6 +56,18 @@ if (!defined('ABSPATH')) {
 // ... The rest of this file is correct and unchanged from the previous version ...
 
 function interactive_curriculum_activate() {
+    // Add 'Student' user role
+    $student_role_exists = get_role('student');
+    if (!$student_role_exists) {
+        add_role(
+            'student',
+            __('Student', 'interactive-curriculum'),
+            array(
+                'read' => true, // Basic capability
+            )
+        );
+    }
+
     global $wpdb;
     $table_name = $wpdb->prefix . 'icp_annotations';
 
@@ -199,11 +211,215 @@ function interactive_curriculum_get_annotations(WP_REST_Request $request) {
     }
 }
 
+function icp_register_post_types() {
+    // Register Book CPT
+    register_post_type('icp_book',
+        array(
+            'labels'      => array(
+                'name'          => __('Books', 'interactive-curriculum'),
+                'singular_name' => __('Book', 'interactive-curriculum'),
+            ),
+            'public'      => true,
+            'has_archive' => true,
+            'supports'    => array('title', 'editor'),
+            'show_in_rest' => true,
+        )
+    );
+
+    // Register Class CPT
+    register_post_type('icp_class',
+        array(
+            'labels'      => array(
+                'name'          => __('Classes', 'interactive-curriculum'),
+                'singular_name' => __('Class', 'interactive-curriculum'),
+            ),
+            'public'      => true,
+            'has_archive' => true,
+            'supports'    => array('title', 'editor'),
+            'show_in_rest' => true,
+        )
+    );
+}
+add_action('init', 'icp_register_post_types');
+
 class Interactive_Curriculum_Plugin {
 
     public function __construct() {
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts_and_styles'));
         add_shortcode('interactive_curriculum_pdf', array($this, 'render_pdf_viewer_shortcode'));
+        add_action('add_meta_boxes', array($this, 'add_custom_meta_boxes'));
+        add_action('save_post_icp_book', array($this, 'save_book_meta_data'));
+        add_action('save_post_icp_class', array($this, 'save_class_meta_data'));
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
+    }
+
+    public function add_custom_meta_boxes() {
+        // Book Meta Boxes
+        add_meta_box(
+            'icp_book_pdf_upload',
+            __('Upload PDF', 'interactive-curriculum'),
+            array($this, 'render_pdf_upload_meta_box'),
+            'icp_book',
+            'normal',
+            'high'
+        );
+        add_meta_box(
+            'icp_book_shortcode',
+            __('Shortcode', 'interactive-curriculum'),
+            array($this, 'render_shortcode_display_meta_box'),
+            'icp_book',
+            'side',
+            'default'
+        );
+
+        // Class Meta Boxes
+        add_meta_box(
+            'icp_class_assign_books',
+            __('Assign Books', 'interactive-curriculum'),
+            array($this, 'render_assign_books_meta_box'),
+            'icp_class',
+            'normal',
+            'high'
+        );
+        add_meta_box(
+            'icp_class_enroll_students',
+            __('Enroll Students', 'interactive-curriculum'),
+            array($this, 'render_enroll_students_meta_box'),
+            'icp_class',
+            'normal',
+            'high'
+        );
+    }
+
+    public function render_pdf_upload_meta_box($post) {
+        wp_nonce_field('icp_save_book_meta', 'icp_book_meta_nonce');
+        $pdf_url = get_post_meta($post->ID, '_icp_pdf_url', true);
+        ?>
+        <p>
+            <label for="icp_pdf_url"><?php _e('PDF URL', 'interactive-curriculum'); ?></label>
+            <input type="text" id="icp_pdf_url" name="icp_pdf_url" value="<?php echo esc_url($pdf_url); ?>" style="width: 100%;" readonly />
+        </p>
+        <p>
+            <button type="button" id="icp_upload_pdf_button" class="button"><?php _e('Upload or Select PDF', 'interactive-curriculum'); ?></button>
+        </p>
+        <?php
+    }
+
+    public function render_shortcode_display_meta_box($post) {
+        ?>
+        <p><?php _e('Copy this shortcode and paste it into your post, page, or text widget content:', 'interactive-curriculum'); ?></p>
+        <input type="text" value="[interactive_curriculum_pdf document_id=&quot;<?php echo $post->ID; ?>&quot;]" readonly style="width: 100%;" />
+        <?php
+    }
+
+    public function save_book_meta_data($post_id) {
+        if (!isset($_POST['icp_book_meta_nonce']) || !wp_verify_nonce($_POST['icp_book_meta_nonce'], 'icp_save_book_meta')) {
+            return;
+        }
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+            return;
+        }
+        if (!current_user_can('edit_post', $post_id)) {
+            return;
+        }
+        if (isset($_POST['icp_pdf_url'])) {
+            update_post_meta($post_id, '_icp_pdf_url', esc_url_raw($_POST['icp_pdf_url']));
+        }
+    }
+
+    public function render_assign_books_meta_box($post) {
+        wp_nonce_field('icp_save_class_meta', 'icp_class_meta_nonce');
+        $assigned_books = get_post_meta($post->ID, '_icp_assigned_books', true) ?: array();
+        $all_books = get_posts(array(
+            'post_type' => 'icp_book',
+            'posts_per_page' => -1,
+            'post_status' => 'publish',
+        ));
+
+        if (empty($all_books)) {
+            echo '<p>' . __('No books found. Please create some first.', 'interactive-curriculum') . '</p>';
+            return;
+        }
+
+        echo '<ul>';
+        foreach ($all_books as $book) {
+            $checked = in_array($book->ID, $assigned_books) ? 'checked' : '';
+            echo '<li>';
+            echo '<label>';
+            echo '<input type="checkbox" name="icp_assigned_books[]" value="' . esc_attr($book->ID) . '" ' . $checked . '> ';
+            echo esc_html($book->post_title);
+            echo '</label>';
+            echo '</li>';
+        }
+        echo '</ul>';
+    }
+
+    public function render_enroll_students_meta_box($post) {
+        $enrolled_students = get_post_meta($post->ID, '_icp_enrolled_students', true) ?: array();
+        $all_students = get_users(array('role' => 'student'));
+
+        if (empty($all_students)) {
+            echo '<p>' . __('No students found.', 'interactive-curriculum') . '</p>';
+            return;
+        }
+
+        echo '<ul>';
+        foreach ($all_students as $student) {
+            $checked = in_array($student->ID, $enrolled_students) ? 'checked' : '';
+            echo '<li>';
+            echo '<label>';
+            echo '<input type="checkbox" name="icp_enrolled_students[]" value="' . esc_attr($student->ID) . '" ' . $checked . '> ';
+            echo esc_html($student->display_name);
+            echo '</label>';
+            echo '</li>';
+        }
+        echo '</ul>';
+    }
+
+    public function save_class_meta_data($post_id) {
+        if (!isset($_POST['icp_class_meta_nonce']) || !wp_verify_nonce($_POST['icp_class_meta_nonce'], 'icp_save_class_meta')) {
+            return;
+        }
+        if (defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) {
+            return;
+        }
+        if (!current_user_can('edit_post', $post_id)) {
+            return;
+        }
+
+        // Save assigned books
+        if (isset($_POST['icp_assigned_books'])) {
+            $assigned_books = array_map('intval', $_POST['icp_assigned_books']);
+            update_post_meta($post_id, '_icp_assigned_books', $assigned_books);
+        } else {
+            delete_post_meta($post_id, '_icp_assigned_books');
+        }
+
+        // Save enrolled students
+        if (isset($_POST['icp_enrolled_students'])) {
+            // Sanitize as integers, then cast to strings for reliable LIKE query
+            $student_ids = array_map('intval', $_POST['icp_enrolled_students']);
+            $student_ids_as_strings = array_map('strval', $student_ids);
+            update_post_meta($post_id, '_icp_enrolled_students', $student_ids_as_strings);
+        } else {
+            delete_post_meta($post_id, '_icp_enrolled_students');
+        }
+    }
+
+    public function enqueue_admin_scripts($hook) {
+        global $post;
+        if ($hook == 'post-new.php' || $hook == 'post.php') {
+            if (isset($post->post_type) && ($post->post_type === 'icp_book' || $post->post_type === 'icp_class')) {
+                wp_enqueue_media();
+                wp_enqueue_script(
+                    'icp-admin-script',
+                    plugins_url('icp-admin-script.js', __FILE__),
+                    array('jquery'),
+                    filemtime(plugin_dir_path(__FILE__) . 'icp-admin-script.js'),
+                    true
+                );
+            }
+        }
     }
 
     public function enqueue_scripts_and_styles() {
@@ -234,22 +450,52 @@ class Interactive_Curriculum_Plugin {
 
     public function render_pdf_viewer_shortcode($atts) {
         $atts = shortcode_atts(array(
-            'pdf_url' => '',
             'document_id' => ''
         ), $atts, 'interactive_curriculum_pdf');
 
         if (!is_user_logged_in()) {
-            return '<p>Please log in to view this document.</p>';
-        }
-
-        $pdf_url = esc_url($atts['pdf_url']);
-        $document_id = sanitize_text_field($atts['document_id']);
-
-        if (empty($pdf_url) || empty($document_id)) {
-            return '<p>Error: Missing PDF URL or Document ID in shortcode.</p>';
+            return '<p>Please log in to view this book.</p>';
         }
 
         $user_id = get_current_user_id();
+        $document_id = intval($atts['document_id']);
+
+        if (empty($document_id) || get_post_type($document_id) !== 'icp_book') {
+            return '<p>Error: Invalid Book ID.</p>';
+        }
+
+        // Permission Check
+        $allowed_books = array();
+        $student_classes = get_posts(array(
+            'post_type' => 'icp_class',
+            'posts_per_page' => -1,
+            'meta_query' => array(
+                array(
+                    'key'     => '_icp_enrolled_students',
+                    'value'   => '"' . strval($user_id) . '"',
+                    'compare' => 'LIKE',
+                ),
+            )
+        ));
+
+        foreach ($student_classes as $class) {
+            $class_books = get_post_meta($class->ID, '_icp_assigned_books', true);
+            if (is_array($class_books)) {
+                $allowed_books = array_merge($allowed_books, $class_books);
+            }
+        }
+        $allowed_books = array_unique($allowed_books);
+
+        if (!in_array($document_id, $allowed_books) && !current_user_can('manage_options')) {
+             return '<p>You do not have permission to view this book.</p>';
+        }
+
+        $pdf_url = get_post_meta($document_id, '_icp_pdf_url', true);
+        if (empty($pdf_url)) {
+            return '<p>Error: PDF not found for this book.</p>';
+        }
+        $pdf_url = esc_url($pdf_url);
+
         $initial_page = (int) get_user_meta($user_id, 'icp_last_page_' . $document_id, true) ?: 1;
 
         $initial_color = get_user_meta($user_id, 'icp_last_color', true) ?: '#FF0000';
