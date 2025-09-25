@@ -3,19 +3,12 @@
  * Plugin Name: Interactive Student Curriculum
  * Plugin URI: https://example.com/interactive-curriculum-plugin
  * Description: Enables interactive PDF viewing and annotation for students.
- * Version: 3.1.0
  * Author: Your Name
  * Author URI: https://example.com
  * License: GPLv2 or later
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
- * = 3.1.0 =
- * * FEAT: Implemented a full access control system for educational materials.
- * * FEAT: Added "Book" and "Class" Custom Post Types (CPTs).
- * * FEAT: Added a "Student" user role upon plugin activation.
- * * FEAT: Admins can now upload PDFs to "Books", assign "Books" to "Classes", and enroll "Students" in "Classes".
- * * FEAT: The `[interactive_curriculum_pdf]` shortcode now enforces that students can only view books for classes they are enrolled in.
  *
  * = 3.0.21 =
  * * PERF: Implemented lazy rendering for PDF pages. Now, when zooming or scrolling, only the pages currently visible in the viewport are re-rendered, significantly improving performance.
@@ -544,20 +537,20 @@ class Interactive_Curriculum_Plugin {
                 </div>
 
                 <div class="toolbar-group">
-                    <button id="select-tool-btn" class="toolbar-btn active-tool" title="Select Tool">
-                        <svg viewBox="0 0 24 24"><path d="M13.5,4.2C13.5,4.2,13.5,4.2,13.5,4.2l-9.3,15.3h8.3l2,4.5l3.5-21.9h-4.5V4.2z"/></svg>
+                    <button id="select-tool-btn" class="toolbar-btn" title="Select Tool">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#000000" viewBox="0 0 256 256"><path d="M168,132.69,214.08,115l.33-.13A16,16,0,0,0,213,85.07L52.92,32.8A15.95,15.95,0,0,0,32.8,52.92L85.07,213a15.82,15.82,0,0,0,14.41,11l.78,0a15.84,15.84,0,0,0,14.61-9.59l.13-.33L132.69,168,184,219.31a16,16,0,0,0,22.63,0l12.68-12.68a16,16,0,0,0,0-22.63ZM195.31,208,144,156.69a16,16,0,0,0-26,4.93c0,.11-.09.22-.13.32l-17.65,46L48,48l159.85,52.2-45.95,17.64-.32.13a16,16,0,0,0-4.93,26h0L208,195.31Z"></path></svg>
                     </button>
-                    <button id="pan-tool-btn" class="toolbar-btn" title="Pan Tool (V)">
-                        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12.92 2.89a2.17 2.17 0 00-2.17-2.17A2.17 2.17 0 008.58.72a2.17 2.17 0 00-2.17 2.17v.21c0 .59.24 1.15.65 1.56l.76.76c.41.41.97.65 1.56.65h.42c.59 0 1.15-.24 1.56-.65l.76-.76c.41-.41.65-.97.65-1.56v-.21zM23 11.5c0-1.4-1.12-2.5-2.5-2.5a2.45 2.45 0 00-1.63.63L15 13.5v-1.75a2.25 2.25 0 00-2.25-2.25A2.25 2.25 0 0010.5 11.75V18c0 .83.67 1.5 1.5 1.5h6.75c.83 0 1.5-.67 1.5-1.5a1.5 1.5 0 00-1.5-1.5H18v-4.1l3.38-3.37c.37-.38.62-.89.62-1.43z"></path></svg>
+                    <button id="pan-tool-btn" class="toolbar-btn active-tool" title="Pan Tool (V)">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#000000" viewBox="0 0 256 256"><path d="M188,48a27.75,27.75,0,0,0-12,2.71V44a28,28,0,0,0-54.65-8.6A28,28,0,0,0,80,60v64l-3.82-6.13a28,28,0,0,0-48.6,27.82c16,33.77,28.93,57.72,43.72,72.69C86.24,233.54,103.2,240,128,240a88.1,88.1,0,0,0,88-88V76A28,28,0,0,0,188,48Zm12,104a72.08,72.08,0,0,1-72,72c-20.38,0-33.51-4.88-45.33-16.85C69.44,193.74,57.26,171,41.9,138.58a6.36,6.36,0,0,0-.3-.58,12,12,0,0,1,20.79-12,1.76,1.76,0,0,0,.14.23l18.67,30A8,8,0,0,0,96,152V60a12,12,0,0,1,24,0v60a8,8,0,0,0,16,0V44a12,12,0,0,1,24,0v76a8,8,0,0,0,16,0V76a12,12,0,0,1,24,0Z"></path></svg>
                     </button>
                     <button id="freehand-tool-btn" class="toolbar-btn" title="Freehand Tool">
-                        <svg viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"></path></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#000000" viewBox="0 0 256 256"><path d="M227.32,73.37,182.63,28.69a16,16,0,0,0-22.63,0L36.69,152A15.86,15.86,0,0,0,32,163.31V208a16,16,0,0,0,16,16H92.69A15.86,15.86,0,0,0,104,219.31l83.67-83.66,3.48,13.9-36.8,36.79a8,8,0,0,0,11.31,11.32l40-40a8,8,0,0,0,2.11-7.6l-6.9-27.61L227.32,96A16,16,0,0,0,227.32,73.37ZM48,179.31,76.69,208H48Zm48,25.38L51.31,160,136,75.31,180.69,120Zm96-96L147.32,64l24-24L216,84.69Z"></path></svg>
                     </button>
                     <button id="highlight-tool-btn" class="toolbar-btn" title="Highlight Tool">
-                        <svg viewBox="0 0 24 24"><path d="m18 4-3.5 3.5 5 5L23 9l-5-5zM4 20l11-11 5 5-11 11H4v-5z"></path></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#000000" viewBox="0 0 256 256"><path d="M253.66,106.34a8,8,0,0,0-11.32,0L192,156.69,107.31,72l50.35-50.34a8,8,0,1,0-11.32-11.32L96,60.69A16,16,0,0,0,93.18,79.5L72,100.69a16,16,0,0,0,0,22.62L76.69,128,18.34,186.34a8,8,0,0,0,3.13,13.25l72,24A7.88,7.88,0,0,0,96,224a8,8,0,0,0,5.66-2.34L136,187.31l4.69,4.69a16,16,0,0,0,22.62,0l21.19-21.18A16,16,0,0,0,203.31,168l50.35-50.34A8,8,0,0,0,253.66,106.34ZM93.84,206.85l-55-18.35L88,139.31,124.69,176ZM152,180.69,83.31,112,104,91.31,172.69,160Z"></path></svg>
                     </button>
                     <button id="text-note-tool-btn" class="toolbar-btn" title="Text Note">
-                         <svg viewBox="0 0 24 24"><path d="M5 4v3h5.5v12h3V7H19V4z"></path></svg>
+                         <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="#000000" viewBox="0 0 256 256"><path d="M208,56V88a8,8,0,0,1-16,0V64H136V192h24a8,8,0,0,1,0,16H96a8,8,0,0,1,0-16h24V64H64V88a8,8,0,0,1-16,0V56a8,8,0,0,1,8-8H200A8,8,0,0,1,208,56Z"></path></svg>
                     </button>
                 </div>
 
