@@ -162,8 +162,11 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- END FABRIC.JS CUSTOMIZATION ---
 
     // --- DOM ELEMENT REFERENCES ---
-    const { pdfUrl, documentId } = container.dataset;
-    const initialPage = parseInt(container.dataset.initialPage, 10) || 1;
+    const isReadOnly = typeof interactiveCurriculumReadOnlyData !== 'undefined';
+    const pdfUrl = isReadOnly ? interactiveCurriculumReadOnlyData.pdfUrl : container.dataset.pdfUrl;
+    const documentId = isReadOnly ? interactiveCurriculumReadOnlyData.documentId : container.dataset.documentId;
+    const studentId = isReadOnly ? interactiveCurriculumReadOnlyData.studentId : null;
+    const initialPage = isReadOnly ? interactiveCurriculumReadOnlyData.initialPage : (parseInt(container.dataset.initialPage, 10) || 1);
     const prevPageBtn = document.getElementById('prev-page-btn');
     const nextPageBtn = document.getElementById('next-page-btn');
     const fullscreenBtn = document.getElementById('fullscreen-btn');
@@ -269,8 +272,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateUndoRedoButtons() { const state = pageStates[currentPageNum]; undoBtn.disabled = !state || state.history.length <= 1; redoBtn.disabled = !state || state.redoStack.length === 0; }
 
     async function loadAnnotations(pageNum, fabricCanvas) {
+        let url = `${interactiveCurriculumData.restUrl}interactive-curriculum/v2/annotations/${documentId}/${pageNum}`;
+        if (isReadOnly && studentId) {
+            url += `?student_id=${studentId}`;
+        }
         try {
-            const response = await fetch(`${interactiveCurriculumData.restUrl}interactive-curriculum/v2/annotations/${documentId}/${pageNum}`, { headers: { 'X-WP-Nonce': interactiveCurriculumData.nonce } });
+            const response = await fetch(url, { headers: { 'X-WP-Nonce': interactiveCurriculumData.nonce } });
             if (response.ok) {
                 const data = await response.json();
                 if (data && data.objects && data.objects.length > 0) {
@@ -432,6 +439,15 @@ document.addEventListener('DOMContentLoaded', () => {
             pageDiv.appendChild(annotationCanvasEl);
 
             const fabricCanvas = new fabric.Canvas(annotationCanvasEl);
+
+            if (isReadOnly) {
+                fabricCanvas.selection = false;
+                fabricCanvas.forEachObject(obj => {
+                    obj.selectable = false;
+                    obj.evented = false;
+                });
+            }
+
             pageStates[pageNum] = {
                 fabricCanvas,
                 history: [],
@@ -455,7 +471,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- MAIN INITIALIZATION ---
     async function initPDFViewer() {
-        if (!pdfUrl) return;
+        if (isReadOnly) {
+            // Hide all annotation-related tools
+            [freehandToolBtn, highlightToolBtn, textNoteToolBtn, colorPicker, sizeSlider, undoBtn, redoBtn, clearPageBtn, saveStatusSpan].forEach(el => {
+                if (el && el.parentElement) el.parentElement.style.display = 'none';
+            });
+             // Also hide the select tool as it's for annotations
+            if (selectToolBtn && selectToolBtn.parentElement) selectToolBtn.parentElement.style.display = 'none';
+        }
+
+        if (!pdfUrl) {
+            if(isReadOnly) {
+                container.innerHTML = '<p>PDF URL not found for this book. Cannot display viewer.</p>';
+            }
+            return;
+        };
+
         try {
             const loadingTask = pdfjsLib.getDocument(pdfUrl);
             pdfDoc = await loadingTask.promise;
