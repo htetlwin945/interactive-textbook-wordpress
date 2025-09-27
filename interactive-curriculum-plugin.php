@@ -204,11 +204,19 @@ function interactive_curriculum_get_annotations(WP_REST_Request $request) {
         $user_id, $document_id, $page_num
     ));
 
+    $response = new WP_REST_Response();
+    // Add LiteSpeed no-cache header to prevent stale annotation data
+    $response->header('X-LiteSpeed-Cache-Control', 'no-cache');
+
     if ($data) {
-        return new WP_REST_Response(json_decode($data), 200);
+        $response->set_data(json_decode($data));
+        $response->set_status(200);
     } else {
-        return new WP_REST_Response(array(), 200);
+        $response->set_data(array());
+        $response->set_status(200);
     }
+
+    return $response;
 }
 
 function icp_register_post_types() {
@@ -251,6 +259,22 @@ class Interactive_Curriculum_Plugin {
         add_action('save_post_icp_book', array($this, 'save_book_meta_data'));
         add_action('save_post_icp_class', array($this, 'save_class_meta_data'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
+        add_action('wp', array($this, 'litespeed_compatibility'));
+    }
+
+    /**
+     * Adds compatibility with the LiteSpeed Cache plugin.
+     * Prevents caching on pages where the interactive viewer is active.
+     */
+    public function litespeed_compatibility() {
+        global $post;
+        // Check if we are on a singular page and the post content has our shortcode
+        if (is_singular() && is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'interactive_curriculum_pdf')) {
+            // Tell LiteSpeed not to cache this page
+            if (function_exists('litespeed_do_not_cache')) {
+                litespeed_do_not_cache('Interactive curriculum page detected');
+            }
+        }
     }
 
     public function add_custom_meta_boxes() {
