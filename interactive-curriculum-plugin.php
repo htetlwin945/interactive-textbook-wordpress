@@ -657,6 +657,15 @@ class Interactive_Curriculum_Plugin {
             filemtime(plugin_dir_path(__FILE__) . 'icp-dashboard.css')
         );
 
+        // Enqueue the dashboard JavaScript
+        wp_enqueue_script(
+            'icp-dashboard-script',
+            plugins_url('icp-dashboard.js', __FILE__),
+            array(),
+            filemtime(plugin_dir_path(__FILE__) . 'icp-dashboard.js'),
+            true
+        );
+
         if (!is_user_logged_in()) {
             return '<p class="icp-login-prompt">' . __('Please log in to view your dashboard.', 'interactive-curriculum') . '</p>';
         }
@@ -715,6 +724,14 @@ class Interactive_Curriculum_Plugin {
                     <p><?php echo esc_html(implode(', ', $class_names)); ?></p>
                 </div>
                 <div class="dashboard-actions">
+                    <div class="view-switcher">
+                        <button id="icp-grid-view-btn" class="view-btn active" title="<?php _e('Grid View', 'interactive-curriculum'); ?>">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M4 4h6v6H4zm8 0h6v6h-6zM4 14h6v6H4zm8 0h6v6h-6z"/></svg>
+                        </button>
+                        <button id="icp-list-view-btn" class="view-btn" title="<?php _e('List View', 'interactive-curriculum'); ?>">
+                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
+                        </button>
+                    </div>
                     <a href="<?php echo wp_logout_url(get_permalink()); ?>" class="logout-button"><?php _e('Logout', 'interactive-curriculum'); ?></a>
                 </div>
             </header>
