@@ -1,0 +1,169 @@
+/*
+ * ICP Student Dashboard Styles
+ */
+
+/* Main Container */
+#icp-dashboard-container {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+    background-color: #f9f9f9;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.07);
+    max-width: 900px;
+    margin: 40px auto;
+}
+
+/* Header */
+.dashboard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e0e0e0;
+    margin-bottom: 25px;
+}
+
+.dashboard-user-info h2 {
+    margin: 0 0 5px 0;
+    font-size: 24px;
+    font-weight: 600;
+    color: #333;
+}
+
+.dashboard-user-info p {
+    margin: 0;
+    font-size: 16px;
+    color: #666;
+}
+
+.logout-button {
+    background-color: #f44336;
+    color: white;
+    padding: 10px 18px;
+    text-decoration: none;
+    border-radius: 5px;
+    font-weight: 500;
+    transition: background-color 0.3s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.logout-button:hover {
+    background-color: #d32f2f;
+}
+
+/* Book List */
+.dashboard-book-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+.book-item a {
+    display: flex;
+    flex-direction: column;
+    background-color: #ffffff;
+    border-radius: 8px;
+    text-decoration: none;
+    color: #333;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    height: 100%;
+    box-sizing: border-box;
+    overflow: hidden; /* Ensures the image corners are rounded */
+}
+
+.book-item a:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+}
+
+.book-cover {
+    width: 100%;
+    height: 180px; /* Adjust as needed */
+    background-color: #f0f0f0;
+}
+
+.book-cover img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover; /* This is key for nice cover scaling */
+}
+
+.book-cover-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    background-color: #e9e9e9;
+    text-align: center;
+    padding: 10px;
+}
+
+.book-cover-placeholder span {
+    font-weight: 600;
+    color: #888;
+}
+
+.book-info {
+    padding: 15px;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.book-title {
+    margin: 0 0 15px 0;
+    font-size: 18px;
+    font-weight: 600;
+    flex-grow: 1; /* Pushes the progress bar down */
+}
+
+/* Progress Bar */
+.book-progress {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.progress-bar-container {
+    flex-grow: 1;
+    background-color: #e0e0e0;
+    border-radius: 5px;
+    height: 10px;
+    overflow: hidden;
+}
+
+.progress-bar-fill {
+    height: 100%;
+    background-color: #0073aa; /* WordPress blue */
+    border-radius: 5px;
+    transition: width 0.5s ease-in-out;
+}
+
+.progress-label {
+    font-size: 13px;
+    color: #555;
+    white-space: nowrap;
+}
+
+/* Responsive Design */
+@media (max-width: 600px) {
+    .dashboard-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+
+    .dashboard-user-info {
+        margin-bottom: 20px;
+    }
+
+    .dashboard-book-list ul {
+        grid-template-columns: 1fr;
+    }
+}
