@@ -242,7 +242,7 @@ function icp_register_post_types() {
             ),
             'public'      => true,
             'has_archive' => true,
-            'supports'    => array('title', 'editor'),
+            'supports'    => array('title', 'editor', 'thumbnail'),
             'show_in_rest' => true,
         )
     );
@@ -667,7 +667,15 @@ class Interactive_Curriculum_Plugin {
         }
 
         $student_id = $user->ID;
-        $student_name = $user->display_name;
+        // Updated student name logic
+        $first_name = $user->first_name;
+        $last_name = $user->last_name;
+        if (!empty($first_name) && !empty($last_name)) {
+            $student_name = $first_name . ' ' . $last_name;
+        } else {
+            $student_name = $user->display_name;
+        }
+
 
         // Find all classes the student is enrolled in
         $enrolled_classes = get_posts(array(
@@ -720,6 +728,7 @@ class Interactive_Curriculum_Plugin {
                         foreach ($unique_book_ids as $book_id) {
                             $book_title = get_the_title($book_id);
                             $book_url = get_permalink($book_id);
+                            $book_cover_url = get_the_post_thumbnail_url($book_id, 'medium');
                             $total_pages = get_post_meta($book_id, '_icp_total_pages', true) ?: 1; // Default to 1 to avoid division by zero
                             $last_read = get_user_meta($student_id, 'icp_last_page_' . $book_id, true) ?: 1;
 
@@ -729,21 +738,32 @@ class Interactive_Curriculum_Plugin {
                             ?>
                             <li class="book-item">
                                 <a href="<?php echo esc_url($book_url); ?>">
-                                    <h3 class="book-title"><?php echo esc_html($book_title); ?></h3>
-                                    <div class="book-progress">
-                                        <div class="progress-bar-container">
-                                            <div class="progress-bar-fill" style="width: <?php echo esc_attr($progress_percentage); ?>%;"></div>
+                                    <div class="book-cover">
+                                        <?php if ($book_cover_url) : ?>
+                                            <img src="<?php echo esc_url($book_cover_url); ?>" alt="<?php echo esc_attr($book_title); ?>" />
+                                        <?php else : ?>
+                                            <div class="book-cover-placeholder">
+                                                <span><?php echo esc_html($book_title); ?></span>
+                                            </div>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="book-info">
+                                        <h3 class="book-title"><?php echo esc_html($book_title); ?></h3>
+                                        <div class="book-progress">
+                                            <div class="progress-bar-container">
+                                                <div class="progress-bar-fill" style="width: <?php echo esc_attr($progress_percentage); ?>%;"></div>
+                                            </div>
+                                            <span class="progress-label">
+                                                <?php
+                                                printf(
+                                                    __('Page %1$d of %2$d (%3$d%%)', 'interactive-curriculum'),
+                                                    esc_html($last_read),
+                                                    esc_html($total_pages),
+                                                    round($progress_percentage)
+                                                );
+                                                ?>
+                                            </span>
                                         </div>
-                                        <span class="progress-label">
-                                            <?php
-                                            printf(
-                                                __('Page %1$d of %2$d (%3$d%%)', 'interactive-curriculum'),
-                                                esc_html($last_read),
-                                                esc_html($total_pages),
-                                                round($progress_percentage)
-                                            );
-                                            ?>
-                                        </span>
                                     </div>
                                 </a>
                             </li>
