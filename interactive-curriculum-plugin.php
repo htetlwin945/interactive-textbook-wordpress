@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Interactive Student Curriculum
  * Plugin URI: https://zeagwat.com
- * Version: 3.0.23
+ * Version: 3.0.24
  * Description: Enables interactive PDF viewing and annotation for students.
  * Author: Zeagwat, Inc.
  * Author URI: https://zeagwat.com
@@ -10,6 +10,9 @@
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
+ *
+ * = 3.0.24 =
+ * * FIX: Improved LiteSpeed Cache compatibility by moving the 'do not cache' directive to a more reliable execution point during shortcode rendering.
  *
  * = 3.0.23 =
  * * TWEAK: Refactored viewer CSS into a separate file for better maintainability.
@@ -269,22 +272,6 @@ class Interactive_Curriculum_Plugin {
         add_action('save_post_icp_book', array($this, 'save_book_meta_data'));
         add_action('save_post_icp_class', array($this, 'save_class_meta_data'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
-        add_action('wp', array($this, 'litespeed_compatibility'));
-    }
-
-    /**
-     * Adds compatibility with the LiteSpeed Cache plugin.
-     * Prevents caching on pages where the interactive viewer is active.
-     */
-    public function litespeed_compatibility() {
-        global $post;
-        // Check if we are on a singular page and the post content has our shortcode
-        if (is_singular() && is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'interactive_curriculum_pdf')) {
-            // Tell LiteSpeed not to cache this page
-            if (function_exists('litespeed_do_not_cache')) {
-                litespeed_do_not_cache('Interactive curriculum page detected');
-            }
-        }
     }
 
     public function add_custom_meta_boxes() {
@@ -490,6 +477,12 @@ class Interactive_Curriculum_Plugin {
     }
 
     public function render_pdf_viewer_shortcode($atts) {
+        // LiteSpeed Cache Compatibility: Tell LiteSpeed not to cache this page.
+        // This is the most reliable place to put this, as it only runs when the shortcode is being rendered.
+        if (function_exists('litespeed_do_not_cache')) {
+            litespeed_do_not_cache('Interactive curriculum page detected');
+        }
+
         $atts = shortcode_atts(array(
             'document_id' => ''
         ), $atts, 'interactive_curriculum_pdf');
