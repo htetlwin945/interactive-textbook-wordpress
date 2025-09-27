@@ -1,14 +1,24 @@
 <?php
 /**
  * Plugin Name: Interactive Student Curriculum
- * Plugin URI: https://example.com/interactive-curriculum-plugin
+ * Plugin URI: https://zeagwat.com
+ * Version: 3.0.23
  * Description: Enables interactive PDF viewing and annotation for students.
- * Author: Your Name
- * Author URI: https://example.com
+ * Author: Zeagwat, Inc.
+ * Author URI: https://zeagwat.com
  * License: GPLv2 or later
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
+ *
+ * = 3.0.23 =
+ * * TWEAK: Refactored viewer CSS into a separate file for better maintainability.
+ * * TWEAK: Added plugin version to the main plugin file header to display in the admin plugins list.
+ * * TWEAK: Reduced font size for the page count indicator and save status message in the viewer toolbar.
+ *
+ * = 3.0.22 =
+ * * FEAT: Added compatibility with LiteSpeed Cache to prevent caching of dynamic viewer pages and annotation data.
+ * * FIX: Replaced page tracking logic with a more robust method based on the viewport center, fixing bugs with Undo/Redo and last-page-read functionality when scrolling between pages.
  *
  * = 3.0.21 =
  * * PERF: Implemented lazy rendering for PDF pages. Now, when zooming or scrolling, only the pages currently visible in the viewport are re-rendered, significantly improving performance.
@@ -450,6 +460,13 @@ class Interactive_Curriculum_Plugin {
         if (!is_singular()) {
             return;
         }
+
+        wp_enqueue_style(
+            'interactive-curriculum-viewer-style',
+            plugins_url('interactive-curriculum-viewer.css', __FILE__),
+            array(),
+            filemtime(plugin_dir_path(__FILE__) . 'interactive-curriculum-viewer.css')
+        );
 
         wp_enqueue_script('pdfjs', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js', array(), '2.11.338', true);
         wp_enqueue_script('fabricjs', 'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js', array(), '5.3.0', true);
