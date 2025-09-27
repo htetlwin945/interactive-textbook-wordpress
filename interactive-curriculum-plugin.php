@@ -1,14 +1,18 @@
 <?php
 /**
  * Plugin Name: Interactive Student Curriculum
- * Plugin URI: https://example.com/interactive-curriculum-plugin
+ * Plugin URI: https://zeagwat.com
  * Description: Enables interactive PDF viewing and annotation for students.
- * Author: Your Name
- * Author URI: https://example.com
+ * Author: Zeagwat, Inc.
+ * Author URI: https://zeagwat.com
  * License: GPLv2 or later
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
+ *
+ * = 3.0.22 =
+ * * FEAT: Added compatibility with LiteSpeed Cache to prevent caching of dynamic viewer pages and annotation data.
+ * * FIX: Replaced page tracking logic with a more robust method based on the viewport center, fixing bugs with Undo/Redo and last-page-read functionality when scrolling between pages.
  *
  * = 3.0.21 =
  * * PERF: Implemented lazy rendering for PDF pages. Now, when zooming or scrolling, only the pages currently visible in the viewport are re-rendered, significantly improving performance.
@@ -204,11 +208,19 @@ function interactive_curriculum_get_annotations(WP_REST_Request $request) {
         $user_id, $document_id, $page_num
     ));
 
+    $response = new WP_REST_Response();
+    // Add LiteSpeed no-cache header to prevent stale annotation data
+    $response->header('X-LiteSpeed-Cache-Control', 'no-cache');
+
     if ($data) {
-        return new WP_REST_Response(json_decode($data), 200);
+        $response->set_data(json_decode($data));
+        $response->set_status(200);
     } else {
-        return new WP_REST_Response(array(), 200);
+        $response->set_data(array());
+        $response->set_status(200);
     }
+
+    return $response;
 }
 
 function icp_register_post_types() {
@@ -251,6 +263,22 @@ class Interactive_Curriculum_Plugin {
         add_action('save_post_icp_book', array($this, 'save_book_meta_data'));
         add_action('save_post_icp_class', array($this, 'save_class_meta_data'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
+        add_action('wp', array($this, 'litespeed_compatibility'));
+    }
+
+    /**
+     * Adds compatibility with the LiteSpeed Cache plugin.
+     * Prevents caching on pages where the interactive viewer is active.
+     */
+    public function litespeed_compatibility() {
+        global $post;
+        // Check if we are on a singular page and the post content has our shortcode
+        if (is_singular() && is_a($post, 'WP_Post') && has_shortcode($post->post_content, 'interactive_curriculum_pdf')) {
+            // Tell LiteSpeed not to cache this page
+            if (function_exists('litespeed_do_not_cache')) {
+                litespeed_do_not_cache('Interactive curriculum page detected');
+            }
+        }
     }
 
     public function add_custom_meta_boxes() {
