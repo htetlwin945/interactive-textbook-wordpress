@@ -228,6 +228,48 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     function toggleFullScreen() { if (!document.fullscreenElement) { container.requestFullscreen(); } else { document.exitFullscreen(); } }
 
+    const debouncedUpdateCurrentPage = debounce(() => {
+        const scrollContainerRect = pdfScrollContainer.getBoundingClientRect();
+        const viewportCenterY = scrollContainerRect.top + scrollContainerRect.height / 2;
+
+        let closestPage = null;
+        let minDistance = Infinity;
+
+        pageElements.forEach(pageDiv => {
+            const pageRect = pageDiv.getBoundingClientRect();
+            if (pageRect.width === 0 && pageRect.height === 0) return; // Skip pages not yet rendered
+
+            const pageCenterY = pageRect.top + pageRect.height / 2;
+            const distance = Math.abs(viewportCenterY - pageCenterY);
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestPage = pageDiv;
+            }
+        });
+
+        if (closestPage) {
+            const newPageNum = parseInt(closestPage.dataset.pageNumber, 10);
+            if (newPageNum !== currentPageNum) {
+                currentPageNum = newPageNum;
+
+                // Update all UI and state based on the new, accurate page number
+                pageInput.value = newPageNum;
+                updateUndoRedoButtons();
+                debouncedSaveLastPage(newPageNum);
+
+                thumbnailElements.forEach(thumb => thumb.classList.remove('active'));
+                const activeThumb = thumbnailView.querySelector(`[data-page-num-thumb="${newPageNum}"]`);
+                if (activeThumb) {
+                    activeThumb.classList.add('active');
+                    if (!isElementInViewport(activeThumb)) {
+                       activeThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                    }
+                }
+            }
+        }
+    }, 100);
+
     const debouncedRenderVisiblePages = debounce(() => {
         pageElements.forEach(pageDiv => {
             if (pageDiv.hasAttribute('data-rendered') && isElementInViewport(pageDiv)) {
@@ -473,24 +515,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             }, { root: pdfScrollContainer, rootMargin: '300px 0px' });
 
-            const pageNumObserver = new IntersectionObserver((entries) => {
-                entries.forEach(entry => {
-                    if (entry.isIntersecting) {
-                        const pageNum = parseInt(entry.target.dataset.pageNumber, 10);
-                        currentPageNum = pageNum;
-                        pageInput.value = pageNum;
-                        updateUndoRedoButtons(); // Update buttons for the new page's history
-                        debouncedSaveLastPage(pageNum);
-                        thumbnailElements.forEach(thumb => thumb.classList.remove('active'));
-                        const activeThumb = thumbnailView.querySelector(`[data-page-num-thumb="${pageNum}"]`);
-                        if (activeThumb) {
-                            activeThumb.classList.add('active');
-                            activeThumb.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                        }
-                    }
-                });
-            }, { root: pdfScrollContainer, threshold: 0.5 });
-
             // --- Page Creation and Initial Sizing ---
             // Reverted to a more stable, fixed-scale initialization to prevent rendering bugs.
             // The previous "fit-to-width" logic was causing some PDFs to fail loading.
@@ -511,16 +535,24 @@ document.addEventListener('DOMContentLoaded', () => {
                 pageElements.push(pageDiv);
 
                 pageRenderObserver.observe(pageDiv);
-                pageNumObserver.observe(pageDiv);
             }
 
             const initialPageDiv = pageElements[initialPage - 1];
             if (initialPageDiv) {
+                // Scroll to the initial page first. The scroll handler will eventually
+                // update the page number, but we set it manually here for immediate UI consistency.
                 initialPageDiv.scrollIntoView({ behavior: 'auto', block: 'start' });
-                // Manually set the initial page number in the input and state,
-                // as the IntersectionObserver may not fire on initial load.
                 pageInput.value = initialPage;
                 currentPageNum = initialPage;
+
+                // Since the IntersectionObserver is gone, we need to manually trigger
+                // the UI updates for the very first page load.
+                updateUndoRedoButtons();
+                const activeThumb = thumbnailView.querySelector(`[data-page-num-thumb="${initialPage}"]`);
+                if (activeThumb) {
+                    activeThumb.classList.add('active');
+                }
+                // The scroll handler will take over from here.
             }
         } catch (reason) {
             console.error('Error loading PDF:', reason);
@@ -554,8 +586,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     pdfScrollContainer.addEventListener('wheel', e => { if (e.ctrlKey) { e.preventDefault(); const delta = e.deltaY > 0 ? -0.15 : 0.15; setZoom(currentScale + delta); } }, { passive: false });
 
-    // Lazy render pages on scroll
-    pdfScrollContainer.addEventListener('scroll', debouncedRenderVisiblePages);
+    // Lazy render pages on scroll and update current page
+    pdfScrollContainer.addEventListener('scroll', () => {
+        debouncedRenderVisiblePages();
+        debouncedUpdateCurrentPage();
+    });
 
     // --- New, Intelligent Touch Controls ---
     let lastAnimationFrame = null;
