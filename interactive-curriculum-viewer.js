@@ -472,8 +472,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
-        // A single finger touch is for panning/scrolling ONLY if the pan tool is active.
-        else if (e.touches.length === 1 && currentTool === 'pan') {
+    // A single finger touch is for panning/scrolling ONLY if the pan tool is active.
+    else if (e.touches.length === 1 && currentTool === 'pan') {
             e.preventDefault();
             touchState.singleFingerPan = true;
             touchState.lastPanPoint = { x: e.touches[0].clientX, y: e.touches[0].clientY };
