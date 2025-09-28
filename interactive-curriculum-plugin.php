@@ -13,7 +13,6 @@
  *
  * = 3.4.0 =
  * * FEAT: Added a "Dashboard Appearance" settings page allowing administrators to customize the student dashboard's branding, layout, colors, and fonts.
- * * FIX: Corrected an issue where custom dashboard styles were not applied due to CSS loading order. Dynamic styles are now correctly injected using `wp_add_inline_style`.
  *
  * = 3.3.0 =
  * * FEAT: Implemented a "Class-Wide Analytics Dashboard" to provide an overview of student progress and activity.
@@ -1289,7 +1288,7 @@ class Interactive_Curriculum_Plugin {
             file_exists(plugin_dir_path(__FILE__) . 'icp-dashboard.css') ? filemtime(plugin_dir_path(__FILE__) . 'icp-dashboard.css') : false
         );
 
-        // Generate and add dynamic inline styles
+        // Get dashboard settings and generate dynamic CSS
         $settings = get_option('icp_dashboard_settings');
         $custom_css = '';
         if (!empty($settings)) {
@@ -1347,11 +1346,9 @@ class Interactive_Curriculum_Plugin {
             $student_name = $user->display_name;
         }
 
-        // Get dashboard settings
-        $settings = get_option('icp_dashboard_settings');
+        // Get logo and layout settings for HTML
         $logo_url = !empty($settings['icp_logo_url']) ? esc_url($settings['icp_logo_url']) : '';
         $default_layout = !empty($settings['icp_default_layout']) && $settings['icp_default_layout'] === 'list' ? 'list-view' : '';
-
 
         // Find all classes the student is enrolled in
         $enrolled_classes = get_posts(array(
