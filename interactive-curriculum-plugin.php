@@ -308,8 +308,177 @@ class Interactive_Curriculum_Plugin {
         add_action('save_post_icp_class', array($this, 'save_class_meta_data'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
         add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('admin_init', array($this, 'register_dashboard_settings'));
         add_action('wp_ajax_icp_get_students_for_class', array($this, 'ajax_get_students_for_class'));
         add_action('wp_ajax_icp_get_books_for_class', array($this, 'ajax_get_books_for_class'));
+        add_action('wp_head', array($this, 'output_dynamic_dashboard_styles'));
+    }
+
+    public function output_dynamic_dashboard_styles() {
+        // Only apply styles on singular pages containing the dashboard shortcode
+        if (!is_singular() || !has_shortcode(get_the_content(), 'icp_student_dashboard')) {
+            return;
+        }
+
+        $settings = get_option('icp_dashboard_settings');
+        if (empty($settings)) {
+            return;
+        }
+
+        $css = '';
+        // Branding & Layout
+        if (!empty($settings['icp_max_width'])) {
+            $css .= '#icp-dashboard-container { max-width: ' . intval($settings['icp_max_width']) . 'px; }';
+        }
+        // Font Controls
+        if (!empty($settings['icp_base_font_size'])) {
+            $css .= '#icp-dashboard-container { font-size: ' . intval($settings['icp_base_font_size']) . 'px; }';
+        }
+        // Color Customization
+        if (!empty($settings['icp_main_bg_color'])) {
+            $css .= '#icp-dashboard-container { background-color: ' . esc_attr($settings['icp_main_bg_color']) . '; }';
+        }
+        if (!empty($settings['icp_item_bg_color'])) {
+            $css .= '.book-item a { background-color: ' . esc_attr($settings['icp_item_bg_color']) . '; }';
+        }
+        if (!empty($settings['icp_progress_bar_color'])) {
+            $css .= '.progress-bar-fill { background-color: ' . esc_attr($settings['icp_progress_bar_color']) . '; }';
+        }
+        if (!empty($settings['icp_header_text_color'])) {
+            $css .= '.dashboard-user-info h2 { color: ' . esc_attr($settings['icp_header_text_color']) . '; }';
+        }
+        if (!empty($settings['icp_body_text_color'])) {
+            $css .= '.dashboard-user-info p { color: ' . esc_attr($settings['icp_body_text_color']) . '; }';
+        }
+
+        if (!empty($css)) {
+            echo '<style type="text/css" id="icp-dynamic-styles">' . $css . '</style>';
+        }
+    }
+
+    public function register_dashboard_settings() {
+        register_setting(
+            'icp_dashboard_settings_group',
+            'icp_dashboard_settings',
+            array('sanitize_callback' => array($this, 'sanitize_dashboard_settings'))
+        );
+
+        // Branding & Layout Section
+        add_settings_section(
+            'icp_dashboard_branding_section',
+            __('Branding & Layout', 'interactive-curriculum'),
+            null,
+            'icp-dashboard-settings'
+        );
+
+        add_settings_field('icp_logo_url', __('Logo Uploader', 'interactive-curriculum'), array($this, 'render_logo_uploader_field'), 'icp-dashboard-settings', 'icp_dashboard_branding_section');
+        add_settings_field('icp_max_width', __('Dashboard Max-Width (px)', 'interactive-curriculum'), array($this, 'render_max_width_field'), 'icp-dashboard-settings', 'icp_dashboard_branding_section');
+        add_settings_field('icp_default_layout', __('Default Layout', 'interactive-curriculum'), array($this, 'render_default_layout_field'), 'icp-dashboard-settings', 'icp_dashboard_branding_section');
+
+        // Color Customization Section
+        add_settings_section(
+            'icp_dashboard_colors_section',
+            __('Color Customization', 'interactive-curriculum'),
+            null,
+            'icp-dashboard-settings'
+        );
+
+        add_settings_field('icp_main_bg_color', __('Main Background Color', 'interactive-curriculum'), array($this, 'render_color_picker_field'), 'icp-dashboard-settings', 'icp_dashboard_colors_section', ['name' => 'icp_main_bg_color']);
+        add_settings_field('icp_item_bg_color', __('Book Item Background', 'interactive-curriculum'), array($this, 'render_color_picker_field'), 'icp-dashboard-settings', 'icp_dashboard_colors_section', ['name' => 'icp_item_bg_color']);
+        add_settings_field('icp_progress_bar_color', __('Progress Bar Color', 'interactive-curriculum'), array($this, 'render_color_picker_field'), 'icp-dashboard-settings', 'icp_dashboard_colors_section', ['name' => 'icp_progress_bar_color']);
+        add_settings_field('icp_header_text_color', __('Header Text Color', 'interactive-curriculum'), array($this, 'render_color_picker_field'), 'icp-dashboard-settings', 'icp_dashboard_colors_section', ['name' => 'icp_header_text_color']);
+        add_settings_field('icp_body_text_color', __('Body Text Color', 'interactive-curriculum'), array($this, 'render_color_picker_field'), 'icp-dashboard-settings', 'icp_dashboard_colors_section', ['name' => 'icp_body_text_color']);
+
+        // Font Controls Section
+        add_settings_section(
+            'icp_dashboard_fonts_section',
+            __('Font Controls', 'interactive-curriculum'),
+            null,
+            'icp-dashboard-settings'
+        );
+
+        add_settings_field('icp_base_font_size', __('Base Font Size (px)', 'interactive-curriculum'), array($this, 'render_base_font_size_field'), 'icp-dashboard-settings', 'icp_dashboard_fonts_section');
+    }
+
+    public function sanitize_dashboard_settings($input) {
+        $sanitized_input = array();
+        if (isset($input['icp_logo_url'])) {
+            $sanitized_input['icp_logo_url'] = esc_url_raw($input['icp_logo_url']);
+        }
+        if (isset($input['icp_max_width'])) {
+            $sanitized_input['icp_max_width'] = absint($input['icp_max_width']);
+        }
+        if (isset($input['icp_default_layout'])) {
+            $sanitized_input['icp_default_layout'] = sanitize_text_field($input['icp_default_layout']);
+        }
+        if (isset($input['icp_main_bg_color'])) {
+            $sanitized_input['icp_main_bg_color'] = sanitize_hex_color($input['icp_main_bg_color']);
+        }
+        if (isset($input['icp_item_bg_color'])) {
+            $sanitized_input['icp_item_bg_color'] = sanitize_hex_color($input['icp_item_bg_color']);
+        }
+        if (isset($input['icp_progress_bar_color'])) {
+            $sanitized_input['icp_progress_bar_color'] = sanitize_hex_color($input['icp_progress_bar_color']);
+        }
+        if (isset($input['icp_header_text_color'])) {
+            $sanitized_input['icp_header_text_color'] = sanitize_hex_color($input['icp_header_text_color']);
+        }
+        if (isset($input['icp_body_text_color'])) {
+            $sanitized_input['icp_body_text_color'] = sanitize_hex_color($input['icp_body_text_color']);
+        }
+        if (isset($input['icp_base_font_size'])) {
+            $sanitized_input['icp_base_font_size'] = absint($input['icp_base_font_size']);
+        }
+        return $sanitized_input;
+    }
+
+    public function render_logo_uploader_field() {
+        $options = get_option('icp_dashboard_settings');
+        $logo_url = isset($options['icp_logo_url']) ? $options['icp_logo_url'] : '';
+        ?>
+        <input type="text" id="icp_logo_url" name="icp_dashboard_settings[icp_logo_url]" value="<?php echo esc_url($logo_url); ?>" style="width: 70%;" readonly />
+        <button type="button" id="icp_upload_logo_button" class="button"><?php _e('Upload Logo', 'interactive-curriculum'); ?></button>
+        <div id="icp-logo-preview" style="margin-top:10px;">
+            <?php if ($logo_url) : ?>
+                <img src="<?php echo esc_url($logo_url); ?>" style="max-width: 200px; height: auto;" />
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    public function render_max_width_field() {
+        $options = get_option('icp_dashboard_settings');
+        $max_width = isset($options['icp_max_width']) ? $options['icp_max_width'] : '900';
+        ?>
+        <input type="number" name="icp_dashboard_settings[icp_max_width]" value="<?php echo esc_attr($max_width); ?>" />
+        <?php
+    }
+
+    public function render_default_layout_field() {
+        $options = get_option('icp_dashboard_settings');
+        $default_layout = isset($options['icp_default_layout']) ? $options['icp_default_layout'] : 'grid';
+        ?>
+        <select name="icp_dashboard_settings[icp_default_layout]">
+            <option value="grid" <?php selected($default_layout, 'grid'); ?>><?php _e('Grid View', 'interactive-curriculum'); ?></option>
+            <option value="list" <?php selected($default_layout, 'list'); ?>><?php _e('List View', 'interactive-curriculum'); ?></option>
+        </select>
+        <?php
+    }
+
+    public function render_color_picker_field($args) {
+        $options = get_option('icp_dashboard_settings');
+        $color = isset($options[$args['name']]) ? $options[$args['name']] : '';
+        ?>
+        <input type="text" name="icp_dashboard_settings[<?php echo esc_attr($args['name']); ?>]" value="<?php echo esc_attr($color); ?>" class="icp-color-picker" />
+        <?php
+    }
+
+    public function render_base_font_size_field() {
+        $options = get_option('icp_dashboard_settings');
+        $font_size = isset($options['icp_base_font_size']) ? $options['icp_base_font_size'] : '';
+        ?>
+        <input type="number" name="icp_dashboard_settings[icp_base_font_size]" value="<?php echo esc_attr($font_size); ?>" />
+        <?php
     }
 
     public function ajax_get_students_for_class() {
@@ -378,6 +547,30 @@ class Interactive_Curriculum_Plugin {
             'icp-class-analytics',
             array($this, 'render_class_analytics_page')
         );
+
+        add_submenu_page(
+            'interactive-curriculum',
+            __('Dashboard Settings', 'interactive-curriculum'),
+            __('Dashboard Settings', 'interactive-curriculum'),
+            'manage_options',
+            'icp-dashboard-settings',
+            array($this, 'render_dashboard_settings_page')
+        );
+    }
+
+    public function render_dashboard_settings_page() {
+        ?>
+        <div class="wrap">
+            <h1><?php _e('Dashboard Appearance Settings', 'interactive-curriculum'); ?></h1>
+            <form method="post" action="options.php">
+                <?php
+                settings_fields('icp_dashboard_settings_group');
+                do_settings_sections('icp-dashboard-settings');
+                submit_button();
+                ?>
+            </form>
+        </div>
+        <?php
     }
 
     public function render_class_analytics_page() {
@@ -849,6 +1042,19 @@ class Interactive_Curriculum_Plugin {
     }
 
     public function enqueue_admin_scripts($hook) {
+        // Enqueue scripts for the new Dashboard Settings page
+        if ('interactive-curriculum_page_icp-dashboard-settings' === $hook) {
+            wp_enqueue_media();
+            wp_enqueue_style('wp-color-picker');
+            wp_enqueue_script(
+                'icp-admin-settings-script',
+                plugins_url('icp-admin-settings.js', __FILE__),
+                array('jquery', 'wp-color-picker'),
+                filemtime(plugin_dir_path(__FILE__) . 'icp-admin-settings.js'),
+                true
+            );
+        }
+
         // Enqueue script for the new Annotation Viewer page
         if ('interactive-curriculum_page_icp-annotation-viewer' === $hook) {
             // Enqueue script for the admin form dropdowns
@@ -1150,6 +1356,11 @@ class Interactive_Curriculum_Plugin {
             $student_name = $user->display_name;
         }
 
+        // Get dashboard settings
+        $settings = get_option('icp_dashboard_settings');
+        $logo_url = !empty($settings['icp_logo_url']) ? esc_url($settings['icp_logo_url']) : '';
+        $default_layout = !empty($settings['icp_default_layout']) && $settings['icp_default_layout'] === 'list' ? 'list-view' : '';
+
 
         // Find all classes the student is enrolled in
         $enrolled_classes = get_posts(array(
@@ -1184,16 +1395,23 @@ class Interactive_Curriculum_Plugin {
         ?>
         <div id="icp-dashboard-container">
             <header class="dashboard-header">
-                <div class="dashboard-user-info">
-                    <h2><?php echo esc_html($student_name); ?></h2>
-                    <p><?php echo esc_html(implode(', ', $class_names)); ?></p>
+                <div class="dashboard-header-left">
+                    <?php if ($logo_url) : ?>
+                    <div class="dashboard-branding">
+                        <img src="<?php echo $logo_url; ?>" alt="<?php _e('Brand Logo', 'interactive-curriculum'); ?>" class="dashboard-logo" />
+                    </div>
+                    <?php endif; ?>
+                    <div class="dashboard-user-info">
+                        <h2><?php echo esc_html($student_name); ?></h2>
+                        <p><?php echo esc_html(implode(', ', $class_names)); ?></p>
+                    </div>
                 </div>
                 <div class="dashboard-actions">
                     <div class="view-switcher">
-                        <button id="icp-grid-view-btn" class="view-btn active" title="<?php _e('Grid View', 'interactive-curriculum'); ?>">
+                        <button id="icp-grid-view-btn" class="view-btn <?php echo ($default_layout !== 'list-view') ? 'active' : ''; ?>" title="<?php _e('Grid View', 'interactive-curriculum'); ?>">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M4 4h6v6H4zm8 0h6v6h-6zM4 14h6v6H4zm8 0h6v6h-6z"/></svg>
                         </button>
-                        <button id="icp-list-view-btn" class="view-btn" title="<?php _e('List View', 'interactive-curriculum'); ?>">
+                        <button id="icp-list-view-btn" class="view-btn <?php echo ($default_layout === 'list-view') ? 'active' : ''; ?>" title="<?php _e('List View', 'interactive-curriculum'); ?>">
                              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
                         </button>
                     </div>
@@ -1201,7 +1419,7 @@ class Interactive_Curriculum_Plugin {
                 </div>
             </header>
 
-            <main class="dashboard-book-list">
+            <main class="dashboard-book-list <?php echo esc_attr($default_layout); ?>">
                 <?php if (empty($unique_book_ids)) : ?>
                     <p><?php _e('No books have been assigned to your class(es) yet.', 'interactive-curriculum'); ?></p>
                 <?php else : ?>
