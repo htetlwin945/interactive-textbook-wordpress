@@ -649,18 +649,47 @@ class Interactive_Curriculum_Plugin {
     public function enqueue_admin_scripts($hook) {
         // Enqueue script for the new Annotation Viewer page
         if ('interactive-curriculum_page_icp-annotation-viewer' === $hook) {
+            // Enqueue script for the admin form dropdowns
             wp_enqueue_script(
-                'icp-annotation-viewer-script',
+                'icp-annotation-viewer-form-script',
                 plugins_url('icp-annotation-viewer.js', __FILE__),
                 array('jquery'),
                 filemtime(plugin_dir_path(__FILE__) . 'icp-annotation-viewer.js'),
                 true
             );
             wp_localize_script(
-                'icp-annotation-viewer-script',
+                'icp-annotation-viewer-form-script',
                 'icp_admin_data',
                 array(
                     'nonce' => wp_create_nonce('icp_admin_nonce')
+                )
+            );
+
+            // Enqueue all scripts and styles required for the PDF viewer itself
+            wp_enqueue_style(
+                'interactive-curriculum-viewer-style',
+                plugins_url('interactive-curriculum-viewer.css', __FILE__),
+                array(),
+                filemtime(plugin_dir_path(__FILE__) . 'interactive-curriculum-viewer.css')
+            );
+
+            wp_enqueue_script('pdfjs', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js', array(), '2.11.338', true);
+            wp_enqueue_script('fabricjs', 'https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js', array(), '5.3.0', true);
+
+            wp_enqueue_script(
+                'interactive-curriculum-viewer',
+                plugins_url('interactive-curriculum-viewer.js', __FILE__),
+                array('jquery', 'pdfjs', 'fabricjs'),
+                filemtime(plugin_dir_path(__FILE__) . 'interactive-curriculum-viewer.js'),
+                true
+            );
+
+            wp_localize_script(
+                'interactive-curriculum-viewer',
+                'interactiveCurriculumData',
+                array(
+                    'restUrl' => get_rest_url(),
+                    'nonce' => wp_create_nonce('wp_rest')
                 )
             );
         }
