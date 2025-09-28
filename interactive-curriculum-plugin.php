@@ -420,7 +420,9 @@ class Interactive_Curriculum_Plugin {
                         ));
 
                         $analytics_data[] = (object) array(
+                        'student_id'   => $student->ID,
                             'student_name' => $student->display_name,
+                        'book_id'      => $book->ID,
                             'book_title'   => $book->post_title,
                             'total_pages'  => $total_pages,
                             'last_read'    => $last_read_page,
@@ -476,6 +478,7 @@ class Interactive_Curriculum_Plugin {
                                 <th><?php _e('Book Title', 'interactive-curriculum'); ?></th>
                                 <th><?php _e('Progress', 'interactive-curriculum'); ?></th>
                                 <th><?php _e('Last Active', 'interactive-curriculum'); ?></th>
+                                <th><?php _e('Actions', 'interactive-curriculum'); ?></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -508,6 +511,17 @@ class Interactive_Curriculum_Plugin {
                                         }
                                         ?>
                                     </td>
+                                    <td>
+                                        <?php
+                                        $viewer_url = add_query_arg(array(
+                                            'page' => 'icp-annotation-viewer',
+                                            'class_id' => $selected_class_id,
+                                            'student_id' => $data->student_id,
+                                            'book_id' => $data->book_id,
+                                        ), admin_url('admin.php'));
+                                        ?>
+                                        <a href="<?php echo esc_url($viewer_url); ?>" class="button"><?php _e('View Annotations', 'interactive-curriculum'); ?></a>
+                                    </td>
                                 </tr>
                             <?php endforeach; ?>
                         </tbody>
@@ -524,19 +538,48 @@ class Interactive_Curriculum_Plugin {
     }
 
     public function render_annotation_viewer_page() {
-        // Check if form was submitted and process it
-        if (
-            isset($_POST['_icp_nonce']) &&
-            wp_verify_nonce($_POST['_icp_nonce'], 'icp_view_student_annotations_nonce') &&
-            current_user_can('manage_options') &&
-            !empty($_POST['icp_book_id']) &&
-            !empty($_POST['icp_student_id'])
-        ) {
-            $this->admin_view_student_id = intval($_POST['icp_student_id']);
+        // Determine selected class, student, and book from GET or POST.
+        $current_class_id = 0;
+        if (isset($_GET['class_id'])) {
+            $current_class_id = intval($_GET['class_id']);
+        } elseif (isset($_POST['icp_class_id'])) {
+            $current_class_id = intval($_POST['icp_class_id']);
+        }
+
+        $current_student_id = 0;
+        if (isset($_GET['student_id'])) {
+            $current_student_id = intval($_GET['student_id']);
+        } elseif (isset($_POST['icp_student_id'])) {
+            $current_student_id = intval($_POST['icp_student_id']);
+        }
+
+        $current_book_id = 0;
+        if (isset($_GET['book_id'])) {
+            $current_book_id = intval($_GET['book_id']);
+        } elseif (isset($_POST['icp_book_id'])) {
+            $current_book_id = intval($_POST['icp_book_id']);
+        }
+
+        $book_id_to_view = null;
+        $can_view = false;
+
+        // Check if we have enough data to show the viewer.
+        if ($current_book_id && $current_student_id && current_user_can('manage_options')) {
+            // For POST requests, we must verify the nonce.
+            if (isset($_POST['_icp_nonce'])) {
+                if (wp_verify_nonce($_POST['_icp_nonce'], 'icp_view_student_annotations_nonce')) {
+                    $can_view = true;
+                }
+            } else {
+                // For GET requests, no nonce is needed, just capability check which is already done.
+                $can_view = true;
+            }
+        }
+
+        if ($can_view) {
+            $this->admin_view_student_id = $current_student_id;
             $this->admin_view_read_only = true;
-            $book_id_to_view = intval($_POST['icp_book_id']);
-        } else {
-            $book_id_to_view = null;
+            $book_id_to_view = $current_book_id;
         }
         ?>
         <div class="wrap">
@@ -556,7 +599,6 @@ class Interactive_Curriculum_Plugin {
                                     <option value=""><?php _e('— Select a Class —', 'interactive-curriculum'); ?></option>
                                     <?php
                                     $classes = get_posts(array('post_type' => 'icp_class', 'post_status' => 'publish', 'posts_per_page' => -1));
-                                    $current_class_id = isset($_POST['icp_class_id']) ? intval($_POST['icp_class_id']) : 0;
                                     foreach ($classes as $class) {
                                         $selected = selected($current_class_id, $class->ID, false);
                                         echo '<option value="' . esc_attr($class->ID) . '" ' . $selected . '>' . esc_html($class->post_title) . '</option>';
@@ -574,7 +616,6 @@ class Interactive_Curriculum_Plugin {
                                     <option value=""><?php _e('— Select a Class First —', 'interactive-curriculum'); ?></option>
                                     <?php
                                     if ($current_class_id) {
-                                        $current_student_id = isset($_POST['icp_student_id']) ? intval($_POST['icp_student_id']) : 0;
                                         $student_ids = get_post_meta($current_class_id, '_icp_enrolled_students', true);
                                         if (!empty($student_ids) && is_array($student_ids)) {
                                             echo '<option value="">— Select a Student —</option>';
@@ -600,7 +641,6 @@ class Interactive_Curriculum_Plugin {
                                     <option value=""><?php _e('— Select a Class First —', 'interactive-curriculum'); ?></option>
                                     <?php
                                     if ($current_class_id) {
-                                        $current_book_id = isset($_POST['icp_book_id']) ? intval($_POST['icp_book_id']) : 0;
                                         $book_ids = get_post_meta($current_class_id, '_icp_assigned_books', true);
                                         if (!empty($book_ids) && is_array($book_ids)) {
                                              echo '<option value="">— Select a Book —</option>';
