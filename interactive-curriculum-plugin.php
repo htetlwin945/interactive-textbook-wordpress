@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Interactive Student Curriculum
  * Plugin URI: https://zeagwat.com
- * Version: 3.0.24
+ * Version: 3.0.25
  * Description: Enables interactive PDF viewing and annotation for students.
  * Author: Zeagwat, Inc.
  * Author URI: https://zeagwat.com
@@ -10,6 +10,9 @@
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
+ *
+ * = 3.0.25 =
+ * * FIX: Resolved a conflict on touch devices where using the 'Select' tool would also trigger panning, making it difficult to move annotations. The panning action is now correctly restricted to only when the 'Pan' tool is active.
  *
  * = 3.0.24 =
  * * FIX: Improved LiteSpeed Cache compatibility by moving the 'do not cache' directive to a more reliable execution point during shortcode rendering.
@@ -242,7 +245,7 @@ function icp_register_post_types() {
             ),
             'public'      => true,
             'has_archive' => true,
-            'supports'    => array('title', 'editor', 'thumbnail'),
+            'supports'    => array('title', 'editor'),
             'show_in_rest' => true,
         )
     );
@@ -268,7 +271,6 @@ class Interactive_Curriculum_Plugin {
     public function __construct() {
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts_and_styles'));
         add_shortcode('interactive_curriculum_pdf', array($this, 'render_pdf_viewer_shortcode'));
-        add_shortcode('icp_student_dashboard', array($this, 'render_student_dashboard_shortcode'));
         add_action('add_meta_boxes', array($this, 'add_custom_meta_boxes'));
         add_action('save_post_icp_book', array($this, 'save_book_meta_data'));
         add_action('save_post_icp_class', array($this, 'save_class_meta_data'));
@@ -316,7 +318,6 @@ class Interactive_Curriculum_Plugin {
     public function render_pdf_upload_meta_box($post) {
         wp_nonce_field('icp_save_book_meta', 'icp_book_meta_nonce');
         $pdf_url = get_post_meta($post->ID, '_icp_pdf_url', true);
-        $total_pages = get_post_meta($post->ID, '_icp_total_pages', true);
         ?>
         <p>
             <label for="icp_pdf_url"><?php _e('PDF URL', 'interactive-curriculum'); ?></label>
@@ -325,14 +326,6 @@ class Interactive_Curriculum_Plugin {
         <p>
             <button type="button" id="icp_upload_pdf_button" class="button"><?php _e('Upload or Select PDF', 'interactive-curriculum'); ?></button>
         </p>
-        <input type="hidden" id="icp_total_pages" name="icp_total_pages" value="<?php echo esc_attr($total_pages); ?>" />
-        <div id="icp-page-count-display">
-             <?php if ($total_pages) : ?>
-                <p><strong><?php _e('Total Pages:', 'interactive-curriculum'); ?></strong> <?php echo esc_html($total_pages); ?></p>
-             <?php else: ?>
-                <p><?php _e('Page count will be automatically determined after selecting a PDF and saving the post.', 'interactive-curriculum'); ?></p>
-             <?php endif; ?>
-        </div>
         <?php
     }
 
@@ -355,9 +348,6 @@ class Interactive_Curriculum_Plugin {
         }
         if (isset($_POST['icp_pdf_url'])) {
             update_post_meta($post_id, '_icp_pdf_url', esc_url_raw($_POST['icp_pdf_url']));
-        }
-        if (isset($_POST['icp_total_pages']) && is_numeric($_POST['icp_total_pages'])) {
-            update_post_meta($post_id, '_icp_total_pages', intval($_POST['icp_total_pages']));
         }
     }
 
@@ -443,28 +433,15 @@ class Interactive_Curriculum_Plugin {
     public function enqueue_admin_scripts($hook) {
         global $post;
         if ($hook == 'post-new.php' || $hook == 'post.php') {
-            if (isset($post->post_type)) {
-                if ($post->post_type === 'icp_book') {
-                    wp_enqueue_media();
-                    // Enqueue pdf.js for the page counting functionality
-                    wp_enqueue_script('pdfjs-admin', 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.11.338/pdf.min.js', array(), '2.11.338', true);
-                    wp_enqueue_script(
-                        'icp-admin-script',
-                        plugins_url('icp-admin-script.js', __FILE__),
-                        array('jquery', 'pdfjs-admin'), // Add pdfjs-admin as a dependency
-                        filemtime(plugin_dir_path(__FILE__) . 'icp-admin-script.js'),
-                        true
-                    );
-                } elseif ($post->post_type === 'icp_class') {
-                     wp_enqueue_media();
-                     wp_enqueue_script(
-                        'icp-admin-script',
-                        plugins_url('icp-admin-script.js', __FILE__),
-                        array('jquery'),
-                        filemtime(plugin_dir_path(__FILE__) . 'icp-admin-script.js'),
-                        true
-                    );
-                }
+            if (isset($post->post_type) && ($post->post_type === 'icp_book' || $post->post_type === 'icp_class')) {
+                wp_enqueue_media();
+                wp_enqueue_script(
+                    'icp-admin-script',
+                    plugins_url('icp-admin-script.js', __FILE__),
+                    array('jquery'),
+                    filemtime(plugin_dir_path(__FILE__) . 'icp-admin-script.js'),
+                    true
+                );
             }
         }
     }
@@ -644,152 +621,6 @@ class Interactive_Curriculum_Plugin {
                     </div>
                 </div>
             </div>
-        </div>
-        <?php
-        return ob_get_clean();
-    }
-    public function render_student_dashboard_shortcode() {
-        // Enqueue the dashboard CSS right here to ensure it only loads when the shortcode is used.
-        wp_enqueue_style(
-            'icp-dashboard-style',
-            plugins_url('icp-dashboard.css', __FILE__),
-            array(),
-            filemtime(plugin_dir_path(__FILE__) . 'icp-dashboard.css')
-        );
-
-        // Enqueue the dashboard JavaScript
-        wp_enqueue_script(
-            'icp-dashboard-script',
-            plugins_url('icp-dashboard.js', __FILE__),
-            array(),
-            filemtime(plugin_dir_path(__FILE__) . 'icp-dashboard.js'),
-            true
-        );
-
-        if (!is_user_logged_in()) {
-            return '<p class="icp-login-prompt">' . __('Please log in to view your dashboard.', 'interactive-curriculum') . '</p>';
-        }
-
-        $user = wp_get_current_user();
-        if (!in_array('student', (array) $user->roles)) {
-            return '<p class="icp-error">' . __('This dashboard is for students only.', 'interactive-curriculum') . '</p>';
-        }
-
-        $student_id = $user->ID;
-        // Updated student name logic
-        $first_name = $user->first_name;
-        $last_name = $user->last_name;
-        if (!empty($first_name) && !empty($last_name)) {
-            $student_name = $first_name . ' ' . $last_name;
-        } else {
-            $student_name = $user->display_name;
-        }
-
-
-        // Find all classes the student is enrolled in
-        $enrolled_classes = get_posts(array(
-            'post_type' => 'icp_class',
-            'posts_per_page' => -1,
-            'meta_query' => array(
-                array(
-                    'key'     => '_icp_enrolled_students',
-                    'value'   => '"' . strval($student_id) . '"',
-                    'compare' => 'LIKE',
-                ),
-            )
-        ));
-
-        if (empty($enrolled_classes)) {
-            return '<p>' . __('You are not currently enrolled in any classes.', 'interactive-curriculum') . '</p>';
-        }
-
-        $class_names = wp_list_pluck($enrolled_classes, 'post_title');
-        $all_assigned_book_ids = array();
-
-        foreach ($enrolled_classes as $class) {
-            $book_ids = get_post_meta($class->ID, '_icp_assigned_books', true);
-            if (is_array($book_ids) && !empty($book_ids)) {
-                $all_assigned_book_ids = array_merge($all_assigned_book_ids, $book_ids);
-            }
-        }
-
-        $unique_book_ids = array_unique($all_assigned_book_ids);
-
-        ob_start();
-        ?>
-        <div id="icp-dashboard-container">
-            <header class="dashboard-header">
-                <div class="dashboard-user-info">
-                    <h2><?php echo esc_html($student_name); ?></h2>
-                    <p><?php echo esc_html(implode(', ', $class_names)); ?></p>
-                </div>
-                <div class="dashboard-actions">
-                    <div class="view-switcher">
-                        <button id="icp-grid-view-btn" class="view-btn active" title="<?php _e('Grid View', 'interactive-curriculum'); ?>">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M4 4h6v6H4zm8 0h6v6h-6zM4 14h6v6H4zm8 0h6v6h-6z"/></svg>
-                        </button>
-                        <button id="icp-list-view-btn" class="view-btn" title="<?php _e('List View', 'interactive-curriculum'); ?>">
-                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"><path d="M4 6h16v2H4zm0 5h16v2H4zm0 5h16v2H4z"/></svg>
-                        </button>
-                    </div>
-                    <a href="<?php echo wp_logout_url(get_permalink()); ?>" class="logout-button"><?php _e('Logout', 'interactive-curriculum'); ?></a>
-                </div>
-            </header>
-
-            <main class="dashboard-book-list">
-                <?php if (empty($unique_book_ids)) : ?>
-                    <p><?php _e('No books have been assigned to your class(es) yet.', 'interactive-curriculum'); ?></p>
-                <?php else : ?>
-                    <ul>
-                        <?php
-                        foreach ($unique_book_ids as $book_id) {
-                            $book_title = get_the_title($book_id);
-                            $book_url = get_permalink($book_id);
-                            $book_cover_url = get_the_post_thumbnail_url($book_id, 'medium');
-                            $total_pages = get_post_meta($book_id, '_icp_total_pages', true) ?: 1; // Default to 1 to avoid division by zero
-                            $last_read = get_user_meta($student_id, 'icp_last_page_' . $book_id, true) ?: 1;
-
-                            $progress_percentage = ($last_read / $total_pages) * 100;
-                            if ($progress_percentage > 100) $progress_percentage = 100;
-
-                            ?>
-                            <li class="book-item">
-                                <a href="<?php echo esc_url($book_url); ?>">
-                                    <div class="book-cover">
-                                        <?php if ($book_cover_url) : ?>
-                                            <img src="<?php echo esc_url($book_cover_url); ?>" alt="<?php echo esc_attr($book_title); ?>" />
-                                        <?php else : ?>
-                                            <div class="book-cover-placeholder">
-                                                <span><?php echo esc_html($book_title); ?></span>
-                                            </div>
-                                        <?php endif; ?>
-                                    </div>
-                                    <div class="book-info">
-                                        <h3 class="book-title"><?php echo esc_html($book_title); ?></h3>
-                                        <div class="book-progress">
-                                            <div class="progress-bar-container">
-                                                <div class="progress-bar-fill" style="width: <?php echo esc_attr($progress_percentage); ?>%;"></div>
-                                            </div>
-                                            <span class="progress-label">
-                                                <?php
-                                                printf(
-                                                    __('Page %1$d of %2$d (%3$d%%)', 'interactive-curriculum'),
-                                                    esc_html($last_read),
-                                                    esc_html($total_pages),
-                                                    round($progress_percentage)
-                                                );
-                                                ?>
-                                            </span>
-                                        </div>
-                                    </div>
-                                </a>
-                            </li>
-                            <?php
-                        }
-                        ?>
-                    </ul>
-                <?php endif; ?>
-            </main>
         </div>
         <?php
         return ob_get_clean();
