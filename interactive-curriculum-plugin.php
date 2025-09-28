@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Interactive Student Curriculum
  * Plugin URI: https://zeagwat.com
- * Version: 3.3.0
+ * Version: 3.4.0
  * Description: Enables interactive PDF viewing and annotation for students.
  * Author: Zeagwat, Inc.
  * Author URI: https://zeagwat.com
@@ -10,6 +10,10 @@
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
+ *
+ * = 3.4.0 =
+ * * FEAT: Added a "Dashboard Appearance" settings page allowing administrators to customize the student dashboard's branding, layout, colors, and fonts.
+ * * FIX: Corrected an issue where custom dashboard styles were not applied due to CSS loading order. Dynamic styles are now correctly injected using `wp_add_inline_style`.
  *
  * = 3.3.0 =
  * * FEAT: Implemented a "Class-Wide Analytics Dashboard" to provide an overview of student progress and activity.
@@ -311,49 +315,6 @@ class Interactive_Curriculum_Plugin {
         add_action('admin_init', array($this, 'register_dashboard_settings'));
         add_action('wp_ajax_icp_get_students_for_class', array($this, 'ajax_get_students_for_class'));
         add_action('wp_ajax_icp_get_books_for_class', array($this, 'ajax_get_books_for_class'));
-        add_action('wp_head', array($this, 'output_dynamic_dashboard_styles'));
-    }
-
-    public function output_dynamic_dashboard_styles() {
-        // Only apply styles on singular pages containing the dashboard shortcode
-        if (!is_singular() || !has_shortcode(get_the_content(), 'icp_student_dashboard')) {
-            return;
-        }
-
-        $settings = get_option('icp_dashboard_settings');
-        if (empty($settings)) {
-            return;
-        }
-
-        $css = '';
-        // Branding & Layout
-        if (!empty($settings['icp_max_width'])) {
-            $css .= '#icp-dashboard-container { max-width: ' . intval($settings['icp_max_width']) . 'px; }';
-        }
-        // Font Controls
-        if (!empty($settings['icp_base_font_size'])) {
-            $css .= '#icp-dashboard-container { font-size: ' . intval($settings['icp_base_font_size']) . 'px; }';
-        }
-        // Color Customization
-        if (!empty($settings['icp_main_bg_color'])) {
-            $css .= '#icp-dashboard-container { background-color: ' . esc_attr($settings['icp_main_bg_color']) . '; }';
-        }
-        if (!empty($settings['icp_item_bg_color'])) {
-            $css .= '.book-item a { background-color: ' . esc_attr($settings['icp_item_bg_color']) . '; }';
-        }
-        if (!empty($settings['icp_progress_bar_color'])) {
-            $css .= '.progress-bar-fill { background-color: ' . esc_attr($settings['icp_progress_bar_color']) . '; }';
-        }
-        if (!empty($settings['icp_header_text_color'])) {
-            $css .= '.dashboard-user-info h2 { color: ' . esc_attr($settings['icp_header_text_color']) . '; }';
-        }
-        if (!empty($settings['icp_body_text_color'])) {
-            $css .= '.dashboard-user-info p { color: ' . esc_attr($settings['icp_body_text_color']) . '; }';
-        }
-
-        if (!empty($css)) {
-            echo '<style type="text/css" id="icp-dynamic-styles">' . $css . '</style>';
-        }
     }
 
     public function register_dashboard_settings() {
@@ -1327,6 +1288,36 @@ class Interactive_Curriculum_Plugin {
             array(),
             file_exists(plugin_dir_path(__FILE__) . 'icp-dashboard.css') ? filemtime(plugin_dir_path(__FILE__) . 'icp-dashboard.css') : false
         );
+
+        // Generate and add dynamic inline styles
+        $settings = get_option('icp_dashboard_settings');
+        $custom_css = '';
+        if (!empty($settings)) {
+            if (!empty($settings['icp_max_width'])) {
+                $custom_css .= '#icp-dashboard-container { max-width: ' . intval($settings['icp_max_width']) . 'px; }';
+            }
+            if (!empty($settings['icp_base_font_size'])) {
+                $custom_css .= '#icp-dashboard-container { font-size: ' . intval($settings['icp_base_font_size']) . 'px; }';
+            }
+            if (!empty($settings['icp_main_bg_color'])) {
+                $custom_css .= '#icp-dashboard-container { background-color: ' . esc_attr($settings['icp_main_bg_color']) . '; }';
+            }
+            if (!empty($settings['icp_item_bg_color'])) {
+                $custom_css .= '.book-item a { background-color: ' . esc_attr($settings['icp_item_bg_color']) . '; }';
+            }
+            if (!empty($settings['icp_progress_bar_color'])) {
+                $custom_css .= '.progress-bar-fill { background-color: ' . esc_attr($settings['icp_progress_bar_color']) . '; }';
+            }
+            if (!empty($settings['icp_header_text_color'])) {
+                $custom_css .= '.dashboard-user-info h2 { color: ' . esc_attr($settings['icp_header_text_color']) . '; }';
+            }
+            if (!empty($settings['icp_body_text_color'])) {
+                $custom_css .= '.dashboard-user-info p { color: ' . esc_attr($settings['icp_body_text_color']) . '; }';
+            }
+        }
+        if (!empty($custom_css)) {
+            wp_add_inline_style('icp-dashboard-style', $custom_css);
+        }
 
         // Enqueue the dashboard JavaScript
         wp_enqueue_script(
