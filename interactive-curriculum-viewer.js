@@ -63,6 +63,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let isPanning = false;
     let lastPanPoint = { x: 0, y: 0 };
     let touchState = { pinching: false, panning: false, singleFingerPan: false, lastDist: 0, lastPanPoint: { x: 0, y: 0 } };
+    const isReadOnly = container.dataset.readOnly === 'true';
     // --- END STATE VARIABLES ---
 
     // --- UTILITY & CORE FUNCTIONS ---
@@ -156,31 +157,55 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- ANNOTATION & DATA LOGIC ---
-    async function saveLastPage(pageNum) { if (!documentId || !pageNum) return; try { await fetch(`${interactiveCurriculumData.restUrl}interactive-curriculum/v2/last-page`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': interactiveCurriculumData.nonce }, body: JSON.stringify({ document_id: documentId, page_num: pageNum }) }); } catch (error) { console.error('Error saving last page:', error); } }
-    async function saveUserColor(color) { try { await fetch(`${interactiveCurriculumData.restUrl}interactive-curriculum/v2/user-color`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': interactiveCurriculumData.nonce }, body: JSON.stringify({ color: color }) }); } catch (error) { console.error('Error saving user color:', error); } }
-    async function saveAnnotations(pageNum, fabricCanvas) { if (!documentId || !pageNum) return; saveStatusSpan.textContent = 'Saving...'; saveStatusSpan.style.opacity = '1'; try { await fetch(`${interactiveCurriculumData.restUrl}interactive-curriculum/v2/annotations/${documentId}/${pageNum}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': interactiveCurriculumData.nonce }, body: JSON.stringify(fabricCanvas.toJSON()) }); saveStatusSpan.textContent = 'Saved'; } catch (error) { saveStatusSpan.textContent = 'Error'; console.error('Error saving annotations:', error); } finally { setTimeout(() => { saveStatusSpan.style.opacity = '0'; }, 2000); } }
+    async function saveLastPage(pageNum) { if (isReadOnly || !documentId || !pageNum) return; try { await fetch(`${interactiveCurriculumData.restUrl}interactive-curriculum/v2/last-page`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': interactiveCurriculumData.nonce }, body: JSON.stringify({ document_id: documentId, page_num: pageNum }) }); } catch (error) { console.error('Error saving last page:', error); } }
+    async function saveUserColor(color) { if (isReadOnly) return; try { await fetch(`${interactiveCurriculumData.restUrl}interactive-curriculum/v2/user-color`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': interactiveCurriculumData.nonce }, body: JSON.stringify({ color: color }) }); } catch (error) { console.error('Error saving user color:', error); } }
+    async function saveAnnotations(pageNum, fabricCanvas) { if (isReadOnly || !documentId || !pageNum) return; saveStatusSpan.textContent = 'Saving...'; saveStatusSpan.style.opacity = '1'; try { await fetch(`${interactiveCurriculumData.restUrl}interactive-curriculum/v2/annotations/${documentId}/${pageNum}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': interactiveCurriculumData.nonce }, body: JSON.stringify(fabricCanvas.toJSON()) }); saveStatusSpan.textContent = 'Saved'; } catch (error) { saveStatusSpan.textContent = 'Error'; console.error('Error saving annotations:', error); } finally { setTimeout(() => { saveStatusSpan.style.opacity = '0'; }, 2000); } }
     const debouncedSave = debounce(saveAnnotations, 2000);
     const debouncedSaveLastPage = debounce(saveLastPage, 1500);
 
-    function saveState(pageNum, fabricCanvas, doSave = true) { if (!pageStates[pageNum] || historyLock) return; const state = pageStates[pageNum]; state.redoStack = []; state.history.push(JSON.stringify(fabricCanvas.toJSON())); updateUndoRedoButtons(); if (doSave) debouncedSave(pageNum, state.fabricCanvas); }
+    function saveState(pageNum, fabricCanvas, doSave = true) { if (isReadOnly || !pageStates[pageNum] || historyLock) return; const state = pageStates[pageNum]; state.redoStack = []; state.history.push(JSON.stringify(fabricCanvas.toJSON())); updateUndoRedoButtons(); if (doSave) debouncedSave(pageNum, state.fabricCanvas); }
     function undo() { const state = pageStates[currentPageNum]; if (!state || state.history.length <= 1) return; historyLock = true; state.redoStack.push(state.history.pop()); const prevState = JSON.parse(state.history[state.history.length - 1]); state.fabricCanvas.loadFromJSON(prevState, () => { state.fabricCanvas.renderAll(); historyLock = false; updateUndoRedoButtons(); debouncedSave(currentPageNum, state.fabricCanvas); }); }
     function redo() { const state = pageStates[currentPageNum]; if (!state || state.redoStack.length === 0) return; historyLock = true; const nextStateRaw = state.redoStack.pop(); state.history.push(nextStateRaw); state.fabricCanvas.loadFromJSON(JSON.parse(nextStateRaw), () => { state.fabricCanvas.renderAll(); historyLock = false; updateUndoRedoButtons(); debouncedSave(currentPageNum, state.fabricCanvas); }); }
     function updateUndoRedoButtons() { const state = pageStates[currentPageNum]; undoBtn.disabled = !state || state.history.length <= 1; redoBtn.disabled = !state || state.redoStack.length === 0; }
 
     async function loadAnnotations(pageNum, fabricCanvas) {
+        const { viewAsStudentId, adminNonce } = container.dataset;
+        let url = `${interactiveCurriculumData.restUrl}interactive-curriculum/v2/annotations/${documentId}/${pageNum}`;
+        const headers = { 'X-WP-Nonce': interactiveCurriculumData.nonce };
+
+        if (viewAsStudentId && adminNonce) {
+            const params = new URLSearchParams({
+                student_id: viewAsStudentId,
+                admin_nonce: adminNonce
+            });
+            url += `?${params.toString()}`;
+        }
+
         try {
-            const response = await fetch(`${interactiveCurriculumData.restUrl}interactive-curriculum/v2/annotations/${documentId}/${pageNum}`, { headers: { 'X-WP-Nonce': interactiveCurriculumData.nonce } });
+            const response = await fetch(url, { headers });
             if (response.ok) {
                 const data = await response.json();
                 if (data && data.objects && data.objects.length > 0) {
                     fabricCanvas.loadFromJSON(data, () => {
                         fabricCanvas.setZoom(currentScale);
                         fabricCanvas.renderAll();
+                        // If read-only, disable interaction with loaded objects
+                        if (isReadOnly) {
+                            fabricCanvas.selection = false;
+                            fabricCanvas.forEachObject(obj => {
+                                obj.selectable = false;
+                                obj.evented = false;
+                            });
+                        }
                     });
                 }
+            } else {
+                console.error('Failed to load annotations:', response.statusText);
             }
-        } catch (error) { console.error('Error loading annotations:', error); }
-        saveState(pageNum, fabricCanvas, false);
+        } catch (error) {
+            console.error('Error loading annotations:', error);
+        }
+        saveState(pageNum, fabricCanvas, false); // Still save initial state for undo history if not read-only
     }
 
     function setActiveTool(toolName) {
@@ -221,6 +246,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function attachAnnotationListeners(fabricCanvas, pageNum) {
+        if (isReadOnly) return;
         fabricCanvas.on({ 'object:added': () => saveState(pageNum, fabricCanvas), 'object:modified': () => saveState(pageNum, fabricCanvas), 'object:removed': () => saveState(pageNum, fabricCanvas) });
         fabricCanvas.on('mouse:down', (opt) => {
             if (currentTool === 'text-note' && !opt.target) {
@@ -354,6 +380,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- MAIN INITIALIZATION ---
     async function initPDFViewer() {
+        if (isReadOnly) {
+            // Hide all annotation-related UI elements
+            freehandToolBtn.style.display = 'none';
+            highlightToolBtn.style.display = 'none';
+            textNoteToolBtn.style.display = 'none';
+            colorPicker.parentElement.style.display = 'none';
+            sizeSlider.style.display = 'none';
+            undoBtn.style.display = 'none';
+            redoBtn.style.display = 'none';
+            clearPageBtn.style.display = 'none';
+            saveStatusSpan.style.display = 'none';
+        }
+
         if (!pdfUrl) return;
         try {
             const loadingTask = pdfjsLib.getDocument(pdfUrl);
