@@ -2,7 +2,7 @@
 /**
  * Plugin Name: Interactive Student Curriculum
  * Plugin URI: https://zeagwat.com
- * Version: 3.1.0
+ * Version: 3.2.0
  * Description: Enables interactive PDF viewing and annotation for students.
  * Author: Zeagwat, Inc.
  * Author URI: https://zeagwat.com
@@ -10,6 +10,9 @@
  * Text Domain: interactive-curriculum
  *
  * == Changelog ==
+ *
+ * = 3.2.0 =
+ * * FEAT: Implemented a "Student Annotation Viewer" for administrators to view student work in a read-only mode.
  *
  * = 3.1.0 =
  * * FEAT: Added a "Student Frontend Dashboard" accessible via the `[icp_student_dashboard]` shortcode. The dashboard includes book covers, progress bars, student's full name, and a grid/list view switcher.
@@ -210,6 +213,19 @@ function interactive_curriculum_get_annotations(WP_REST_Request $request) {
     $document_id = sanitize_text_field($request->get_param('document_id'));
     $page_num = (int)$request->get_param('page_num');
 
+    // Admin override logic
+    if (current_user_can('manage_options') && $request->get_param('student_id')) {
+        // The 'wp_rest' nonce is already checked by default for permission_callback.
+        // We add an extra layer of security by checking for a specific admin nonce if a student_id is passed.
+        $admin_nonce = $request->get_param('admin_nonce');
+        if (wp_verify_nonce($admin_nonce, 'icp_view_student_annotations_' . $request->get_param('student_id'))) {
+            $user_id = (int)$request->get_param('student_id');
+        } else {
+            // If a student_id is provided but the nonce is invalid, deny the request.
+            return new WP_REST_Response(array('status' => 'error', 'message' => 'Invalid admin nonce.'), 403);
+        }
+    }
+
     if (empty($user_id) || empty($document_id) || empty($page_num)) {
         return new WP_REST_Response(array('status' => 'error', 'message' => 'Invalid data provided.'), 400);
     }
@@ -270,6 +286,9 @@ add_action('init', 'icp_register_post_types');
 
 class Interactive_Curriculum_Plugin {
 
+    private $admin_view_student_id = null;
+    private $admin_view_read_only = false;
+
     public function __construct() {
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts_and_styles'));
         add_shortcode('interactive_curriculum_pdf', array($this, 'render_pdf_viewer_shortcode'));
@@ -278,6 +297,188 @@ class Interactive_Curriculum_Plugin {
         add_action('save_post_icp_book', array($this, 'save_book_meta_data'));
         add_action('save_post_icp_class', array($this, 'save_class_meta_data'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
+        add_action('admin_menu', array($this, 'add_admin_menu'));
+        add_action('wp_ajax_icp_get_students_for_class', array($this, 'ajax_get_students_for_class'));
+        add_action('wp_ajax_icp_get_books_for_class', array($this, 'ajax_get_books_for_class'));
+    }
+
+    public function ajax_get_students_for_class() {
+        check_ajax_referer('icp_admin_nonce', 'nonce');
+        if (!current_user_can('manage_options') || !isset($_POST['class_id'])) {
+            wp_send_json_error();
+        }
+
+        $class_id = intval($_POST['class_id']);
+        $student_ids = get_post_meta($class_id, '_icp_enrolled_students', true);
+        $students_data = array();
+
+        if (!empty($student_ids)) {
+            $students = get_users(array('include' => $student_ids, 'fields' => array('ID', 'display_name')));
+            foreach ($students as $student) {
+                $students_data[] = array('id' => $student->ID, 'name' => $student->display_name);
+            }
+        }
+        wp_send_json_success($students_data);
+    }
+
+    public function ajax_get_books_for_class() {
+        check_ajax_referer('icp_admin_nonce', 'nonce');
+        if (!current_user_can('manage_options') || !isset($_POST['class_id'])) {
+            wp_send_json_error();
+        }
+
+        $class_id = intval($_POST['class_id']);
+        $book_ids = get_post_meta($class_id, '_icp_assigned_books', true);
+        $books_data = array();
+
+        if (!empty($book_ids)) {
+            $books = get_posts(array('post__in' => $book_ids, 'post_type' => 'icp_book', 'post_status' => 'publish', 'numberposts' => -1));
+            foreach ($books as $book) {
+                $books_data[] = array('id' => $book->ID, 'title' => $book->post_title);
+            }
+        }
+        wp_send_json_success($books_data);
+    }
+
+    public function add_admin_menu() {
+        add_menu_page(
+            __('Interactive Curriculum', 'interactive-curriculum'),
+            __('Interactive Curriculum', 'interactive-curriculum'),
+            'manage_options',
+            'interactive-curriculum',
+            null, // No top-level page content
+            'dashicons-book-alt',
+            20
+        );
+
+        add_submenu_page(
+            'interactive-curriculum',
+            __('Annotation Viewer', 'interactive-curriculum'),
+            __('Annotation Viewer', 'interactive-curriculum'),
+            'manage_options',
+            'icp-annotation-viewer',
+            array($this, 'render_annotation_viewer_page')
+        );
+    }
+
+    public function render_annotation_viewer_page() {
+        // Check if form was submitted and process it
+        if (
+            isset($_POST['_icp_nonce']) &&
+            wp_verify_nonce($_POST['_icp_nonce'], 'icp_view_student_annotations_nonce') &&
+            current_user_can('manage_options') &&
+            !empty($_POST['icp_book_id']) &&
+            !empty($_POST['icp_student_id'])
+        ) {
+            $this->admin_view_student_id = intval($_POST['icp_student_id']);
+            $this->admin_view_read_only = true;
+            $book_id_to_view = intval($_POST['icp_book_id']);
+        } else {
+            $book_id_to_view = null;
+        }
+        ?>
+        <div class="wrap">
+            <h1><?php _e('Student Annotation Viewer', 'interactive-curriculum'); ?></h1>
+            <p><?php _e('Select a class, student, and book to view the student\'s annotations. The view will be read-only.', 'interactive-curriculum'); ?></p>
+
+            <form id="icp-annotation-viewer-form" method="POST" action="">
+                <?php wp_nonce_field('icp_view_student_annotations_nonce', '_icp_nonce'); ?>
+                <table class="form-table">
+                    <tbody>
+                        <tr valign="top">
+                            <th scope="row">
+                                <label for="icp_class_id"><?php _e('Select a Class', 'interactive-curriculum'); ?></label>
+                            </th>
+                            <td>
+                                <select id="icp_class_id" name="icp_class_id" required style="min-width: 200px;">
+                                    <option value=""><?php _e('— Select a Class —', 'interactive-curriculum'); ?></option>
+                                    <?php
+                                    $classes = get_posts(array('post_type' => 'icp_class', 'post_status' => 'publish', 'posts_per_page' => -1));
+                                    $current_class_id = isset($_POST['icp_class_id']) ? intval($_POST['icp_class_id']) : 0;
+                                    foreach ($classes as $class) {
+                                        $selected = selected($current_class_id, $class->ID, false);
+                                        echo '<option value="' . esc_attr($class->ID) . '" ' . $selected . '>' . esc_html($class->post_title) . '</option>';
+                                    }
+                                    ?>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr valign="top">
+                            <th scope="row">
+                                <label for="icp_student_id"><?php _e('Select a Student', 'interactive-curriculum'); ?></label>
+                            </th>
+                            <td>
+                                <select id="icp_student_id" name="icp_student_id" required <?php if (!$current_class_id) echo 'disabled'; ?> style="min-width: 200px;">
+                                    <option value=""><?php _e('— Select a Class First —', 'interactive-curriculum'); ?></option>
+                                    <?php
+                                    if ($current_class_id) {
+                                        $current_student_id = isset($_POST['icp_student_id']) ? intval($_POST['icp_student_id']) : 0;
+                                        $student_ids = get_post_meta($current_class_id, '_icp_enrolled_students', true);
+                                        if (!empty($student_ids) && is_array($student_ids)) {
+                                            echo '<option value="">— Select a Student —</option>';
+                                            $students = get_users(array('include' => $student_ids, 'fields' => array('ID', 'display_name'), 'orderby' => 'display_name'));
+                                            foreach ($students as $student) {
+                                                $selected = selected($current_student_id, $student->ID, false);
+                                                echo '<option value="' . esc_attr($student->ID) . '" ' . $selected . '>' . esc_html($student->display_name) . '</option>';
+                                            }
+                                        } else {
+                                            echo '<option value="">— No Students Found —</option>';
+                                        }
+                                    }
+                                    ?>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr valign="top">
+                            <th scope="row">
+                                <label for="icp_book_id"><?php _e('Select a Book', 'interactive-curriculum'); ?></label>
+                            </th>
+                            <td>
+                                <select id="icp_book_id" name="icp_book_id" required <?php if (!$current_class_id) echo 'disabled'; ?> style="min-width: 200px;">
+                                    <option value=""><?php _e('— Select a Class First —', 'interactive-curriculum'); ?></option>
+                                    <?php
+                                    if ($current_class_id) {
+                                        $current_book_id = isset($_POST['icp_book_id']) ? intval($_POST['icp_book_id']) : 0;
+                                        $book_ids = get_post_meta($current_class_id, '_icp_assigned_books', true);
+                                        if (!empty($book_ids) && is_array($book_ids)) {
+                                             echo '<option value="">— Select a Book —</option>';
+                                            $books = get_posts(array('post__in' => $book_ids, 'post_type' => 'icp_book', 'post_status' => 'publish', 'numberposts' => -1, 'orderby' => 'title', 'order' => 'ASC'));
+                                            foreach ($books as $book) {
+                                                $selected = selected($current_book_id, $book->ID, false);
+                                                echo '<option value="' . esc_attr($book->ID) . '" ' . $selected . '>' . esc_html($book->post_title) . '</option>';
+                                            }
+                                        } else {
+                                            echo '<option value="">— No Books Found —</option>';
+                                        }
+                                    }
+                                    ?>
+                                </select>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+                <?php submit_button(__('View Annotations', 'interactive-curriculum')); ?>
+            </form>
+
+            <hr/>
+
+            <div id="icp-viewer-container">
+                <?php
+                if ($book_id_to_view) {
+                    $student_user = get_userdata($this->admin_view_student_id);
+                    $book_title = get_the_title($book_id_to_view);
+                    echo '<h2>' . sprintf(
+                        esc_html__('Viewing annotations for %1$s in "%2$s"', 'interactive-curriculum'),
+                        '<strong>' . esc_html($student_user->display_name) . '</strong>',
+                        '<em>' . esc_html($book_title) . '</em>'
+                    ) . '</h2>';
+
+                    echo do_shortcode('[interactive_curriculum_pdf document_id="' . $book_id_to_view . '"]');
+                }
+                ?>
+            </div>
+        </div>
+        <?php
     }
 
     public function add_custom_meta_boxes() {
@@ -446,6 +647,24 @@ class Interactive_Curriculum_Plugin {
     }
 
     public function enqueue_admin_scripts($hook) {
+        // Enqueue script for the new Annotation Viewer page
+        if ('interactive-curriculum_page_icp-annotation-viewer' === $hook) {
+            wp_enqueue_script(
+                'icp-annotation-viewer-script',
+                plugins_url('icp-annotation-viewer.js', __FILE__),
+                array('jquery'),
+                filemtime(plugin_dir_path(__FILE__) . 'icp-annotation-viewer.js'),
+                true
+            );
+            wp_localize_script(
+                'icp-annotation-viewer-script',
+                'icp_admin_data',
+                array(
+                    'nonce' => wp_create_nonce('icp_admin_nonce')
+                )
+            );
+        }
+
         global $post;
         if ($hook == 'post-new.php' || $hook == 'post.php') {
             if (isset($post->post_type)) {
@@ -509,7 +728,6 @@ class Interactive_Curriculum_Plugin {
 
     public function render_pdf_viewer_shortcode($atts) {
         // LiteSpeed Cache Compatibility: Tell LiteSpeed not to cache this page.
-        // This is the most reliable place to put this, as it only runs when the shortcode is being rendered.
         if (function_exists('litespeed_do_not_cache')) {
             litespeed_do_not_cache('Interactive curriculum page detected');
         }
@@ -522,12 +740,13 @@ class Interactive_Curriculum_Plugin {
             return '<p>Please log in to view this book.</p>';
         }
 
-        $user_id = get_current_user_id();
         $document_id = intval($atts['document_id']);
-
         if (empty($document_id) || get_post_type($document_id) !== 'icp_book') {
             return '<p>Error: Invalid Book ID.</p>';
         }
+
+        $is_admin_view = $this->admin_view_student_id && current_user_can('manage_options');
+        $user_id_to_check = $is_admin_view ? $this->admin_view_student_id : get_current_user_id();
 
         // Permission Check
         $allowed_books = array();
@@ -537,7 +756,7 @@ class Interactive_Curriculum_Plugin {
             'meta_query' => array(
                 array(
                     'key'     => '_icp_enrolled_students',
-                    'value'   => '"' . strval($user_id) . '"',
+                    'value'   => '"' . strval($user_id_to_check) . '"',
                     'compare' => 'LIKE',
                 ),
             )
@@ -561,14 +780,24 @@ class Interactive_Curriculum_Plugin {
         }
         $pdf_url = esc_url($pdf_url);
 
-        $initial_page = (int) get_user_meta($user_id, 'icp_last_page_' . $document_id, true) ?: 1;
-
-        $initial_color = get_user_meta($user_id, 'icp_last_color', true) ?: '#FF0000';
+        $initial_page = (int) get_user_meta($user_id_to_check, 'icp_last_page_' . $document_id, true) ?: 1;
+        $initial_color = get_user_meta($user_id_to_check, 'icp_last_color', true) ?: '#FF0000';
         $initial_color = sanitize_hex_color($initial_color);
+
+        $container_attrs = 'data-pdf-url="' . esc_url($pdf_url) . '" ' .
+                           'data-document-id="' . esc_attr($document_id) . '" ' .
+                           'data-initial-page="' . esc_attr($initial_page) . '"';
+
+        if ($is_admin_view && $this->admin_view_read_only) {
+            $container_attrs .= ' data-view-as-student-id="' . esc_attr($this->admin_view_student_id) . '"';
+            $container_attrs .= ' data-read-only="true"';
+            $admin_nonce = wp_create_nonce('icp_view_student_annotations_' . $this->admin_view_student_id);
+            $container_attrs .= ' data-admin-nonce="' . esc_attr($admin_nonce) . '"';
+        }
 
         ob_start();
         ?>
-        <div id="interactive-curriculum-container" data-pdf-url="<?php echo $pdf_url; ?>" data-document-id="<?php echo $document_id; ?>" data-initial-page="<?php echo $initial_page; ?>">
+        <div id="interactive-curriculum-container" <?php echo $container_attrs; ?>>
             <div id="pdf-viewer-toolbar">
                 <div class="toolbar-group">
                     <button id="sidebar-toggle-btn" class="toolbar-btn" title="Toggle Thumbnails">
