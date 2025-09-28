@@ -25,6 +25,22 @@
     gap: 20px;
 }
 
+.dashboard-header-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.dashboard-branding {
+    flex-shrink: 0;
+}
+
+.dashboard-logo {
+    max-height: 60px;
+    width: auto;
+    display: block;
+}
+
 .dashboard-user-info h2 {
     margin: 0 0 5px 0;
     font-size: 24px;
